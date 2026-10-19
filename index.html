@@ -3,12 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Botaniq</title>
+  <meta name="theme-color" content="#263b2c">
+  <meta name="description" content="BotaniQ — garden tracking and resource management for CUAI.">
+  <title>BotaniQ · Garden workspace</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <h1>Welcome to Botaniq</h1>
-
-  <script src="js/script.js"></script>
+  <div id="app"><div class="boot">BotaniQ <span>Opening your garden workspace…</span></div></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="modal" aria-labelledby="modal-title"></dialog>
+  <noscript>Enable JavaScript to use the garden workspace.</noscript>
+  <script type="module" src="js/script.js"></script>
 </body>
 </html>
