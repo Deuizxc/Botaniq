@@ -223,4 +223,4 @@ BotaniQ deliberately does not include pesticide or insecticide task categories, 
 
 ## Author
 
-Built by [@Deuizxc](https://github.com/Deuizxc) for CUAI, Quezon City University.
+Built by [@Deuizxc](https://github.com/Deuizxc) [@inferism](https://github.com/inferism) for CUAI, Quezon City University.
