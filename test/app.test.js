@@ -13,13 +13,13 @@ async function fixture(t) {
     const response=await fetch(base+path,{method:body===undefined?'GET':'POST',headers:{...(body===undefined?{}:{'Content-Type':'application/json'}),Cookie:cookie,...headers},body:body===undefined?undefined:JSON.stringify(body)});
     return {status:response.status,body:response.headers.get('Content-Type')?.includes('application/json')?await response.json():await response.text(),cookie:response.headers.get('Set-Cookie')?.split(';')[0],headers:response.headers};
   }
-  async function login(email='admin@botaniq.local') {const response=await request('/api/login',{email,password});assert.equal(response.status,200);return response.cookie;}
+  async function login(email='admin@gmail.com') {const response=await request('/api/login',{email,password});assert.equal(response.status,200);return response.cookie;}
   return {db,request,login,password};
 }
 test('authenticated state, role boundaries, and static files protect database records',async t=>{
   const {request,login}=await fixture(t);
   assert.equal((await request('/api/state')).status,401);
-  const staff=await login('mika@botaniq.local'),state=await request('/api/state',undefined,staff);
+  const staff=await login('heavenashley@gmail.com'),state=await request('/api/state',undefined,staff);
   assert.equal(state.status,200);assert.deepEqual(state.body.archive,[]);
   assert.equal(state.body.users[0].email,undefined);
   assert.ok(state.body.users.every(u=>!('password_hash' in u)));
@@ -52,21 +52,21 @@ test('transplant is atomic and preserves identity, origin and planting date',asy
   assert.equal((await request('/api/transplant',{cycle_id:4,target_plot_id:6},admin)).status,400);
 });
 test('staff takeover requires a reason, preserves assignee, and raises an admin flag',async t=>{
-  const {db,request,login}=await fixture(t),staff=await login('mika@botaniq.local');
+  const {db,request,login}=await fixture(t),staff=await login('heavenashley@gmail.com');
   assert.equal((await request('/api/takeover',{task_id:3,takeover_reason:'  '},staff)).status,400);
   assert.equal((await request('/api/complete',{task_id:3},staff)).status,403);
   assert.equal((await request('/api/takeover',{task_id:1,takeover_reason:'My own task'},staff)).status,403);
-  assert.equal((await request('/api/takeover',{task_id:3,takeover_reason:'Paolo is absent.'},staff)).status,200);
+  assert.equal((await request('/api/takeover',{task_id:3,takeover_reason:'Brent is absent.'},staff)).status,200);
   const task=db.prepare('SELECT * FROM maintenance_tasks WHERE task_id=3').get();
   assert.equal(task.assigned_staff_id,3);assert.equal(task.substitute_staff_id,2);assert.equal(task.is_flagged_for_admin,1);assert.equal(task.status,'Completed');assert.ok(task.completed_at);
   assert.equal((await request('/api/takeover',{task_id:3,takeover_reason:'Again'},staff)).status,409);
   assert.equal((await request('/api/review',{task_id:3},staff)).status,403);
   const admin=await login();assert.equal((await request('/api/review',{task_id:3},admin)).status,200);
   const reviewed=db.prepare('SELECT * FROM maintenance_tasks WHERE task_id=3').get();
-  assert.equal(reviewed.takeover_reason,'Paolo is absent.');assert.ok(reviewed.reviewed_at);assert.equal(reviewed.is_flagged_for_admin,0);
+  assert.equal(reviewed.takeover_reason,'Brent is absent.');assert.ok(reviewed.reviewed_at);assert.equal(reviewed.is_flagged_for_admin,0);
 });
 test('weather adjustments retain a schedule audit and cannot change unrelated staff tasks',async t=>{
-  const {db,request,login}=await fixture(t),staff=await login('mika@botaniq.local');
+  const {db,request,login}=await fixture(t),staff=await login('heavenashley@gmail.com');
   assert.equal((await request('/api/adjust',{task_id:3,action:'Skip',reason:'Rain'},staff)).status,403);
   assert.equal((await request('/api/adjust',{task_id:1,action:'Skip',reason:''},staff)).status,400);
   assert.equal((await request('/api/adjust',{task_id:1,action:'Reschedule',scheduled_date:'2026-10-20',scheduled_time:'09:00',reason:'Heavy rain'},staff)).status,200);
@@ -87,11 +87,11 @@ test('harvest, replacement, assignment and date validation preserve history',asy
   assert.equal(db.prepare('SELECT assigned_staff_id FROM crop_cycles WHERE cycle_id=8').get().assigned_staff_id,null);
 });
 test('account management, password changes and session revocation are enforced',async t=>{
-  const {request,login,password}=await fixture(t),admin=await login(),staff=await login('mika@botaniq.local');
+  const {request,login,password}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
   assert.equal((await request('/api/user-status',{user_id:1,active:false},admin)).status,400);
   assert.equal((await request('/api/user-status',{user_id:2,active:false},admin)).status,200);
   assert.equal((await request('/api/state',undefined,staff)).status,401);
-  assert.equal((await request('/api/login',{email:'mika@botaniq.local',password})).status,401);
+  assert.equal((await request('/api/login',{email:'heavenashley@gmail.com',password})).status,401);
   assert.equal((await request('/api/users',{full_name:'Test Staff',email:'test@example.com',role:'Staff',password:'a strong new password '},admin)).status,200);
   const signIn=await request('/api/login',{email:'test@example.com',password:'a strong new password '});assert.equal(signIn.status,200);
   assert.match(signIn.headers.get('Set-Cookie'),/HttpOnly/);assert.match(signIn.headers.get('Set-Cookie'),/SameSite=Strict/);
@@ -99,7 +99,7 @@ test('account management, password changes and session revocation are enforced',
   assert.equal((await request('/api/state',undefined,signIn.cookie)).status,401);
 });
 test('catalog, scheduling and nutrient logs validate trust boundaries',async t=>{
-  const {db,request,login}=await fixture(t),admin=await login(),staff=await login('mika@botaniq.local');
+  const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
   assert.equal((await request('/api/plants',{crop_name:'Eggplant',variety:'Long purple',notes:'Transplant when ready.'},admin)).status,200);
   assert.equal((await request('/api/plants',{crop_name:'Eggplant'},admin)).status,409);
   assert.equal((await request('/api/plots',{plot_code:'OP-05',zone:'Outdoor'},admin)).status,200);

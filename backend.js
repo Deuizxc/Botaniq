@@ -124,22 +124,35 @@ export async function seedDemo(dbPool, today = gardenDate()) {
   if (seeded) return null;
   const client = await dbPool.connect();
   try {
+    const password = '123';
+    const accounts = [
+      ['Admin Admin', 'admin@gmail.com', 'Admin', 'admin@botaniq.local'],
+      ['Heaven Ashley De Paz', 'heavenashley@gmail.com', 'Staff', 'mika@botaniq.local'],
+      ['Brent Andrei Leur Furton', 'andreifurton@gmail.com', 'Staff', 'paolo@botaniq.local'],
+      ['John Bernard Bacani', 'johntayag@gmail.com', 'Staff', 'sam@botaniq.local']
+    ];
+    await client.query('BEGIN');
+    await client.query('LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
     const { rows } = await client.query('SELECT COUNT(*)::int AS n FROM users');
     if (rows[0].n > 0) {
+      for (const [fullName, email, role, previousEmail] of accounts) {
+        // Keep record IDs so existing garden assignments and history survive the account replacement.
+        const result = await client.query(
+          'UPDATE users SET full_name=$1,email=$2,password_hash=$3,role=$4,active=1 WHERE email=$5 RETURNING user_id',
+          [fullName, email, hashPassword(password), role, previousEmail]
+        );
+        for (const user of result.rows) {
+          await client.query('DELETE FROM sessions WHERE user_id=$1', [user.user_id]);
+        }
+      }
+      await client.query('COMMIT');
       seeded = true;
       return null;
     }
-    const password = process.env.DEMO_PASSWORD || 'botaniq-demo-1234';
     const day = offset => shiftDays(today, offset);
     const db = createRunner(client);
 
-    await client.query('BEGIN');
-    for (const [fullName, email, role] of [
-      ['Alex Rivera', 'admin@botaniq.local', 'Admin'],
-      ['Mika Santos', 'mika@botaniq.local', 'Staff'],
-      ['Paolo Reyes', 'paolo@botaniq.local', 'Staff'],
-      ['Sam Cruz', 'sam@botaniq.local', 'Staff']
-    ]) {
+    for (const [fullName, email, role] of accounts) {
       await db.run(
         'INSERT INTO users(full_name,email,password_hash,role) VALUES(?,?,?,?)',
         fullName,
@@ -203,7 +216,7 @@ export async function seedDemo(dbPool, today = gardenDate()) {
     }
 
     await db.run(
-      "UPDATE maintenance_tasks SET status='Completed',substitute_staff_id=4,takeover_reason='Paolo is away today. I covered the nursery watering.',is_flagged_for_admin=1,completed_at=? WHERE task_id=6",
+      "UPDATE maintenance_tasks SET status='Completed',substitute_staff_id=4,takeover_reason='Brent is away today. I covered the nursery watering.',is_flagged_for_admin=1,completed_at=? WHERE task_id=6",
       `${today}T00:40:00.000Z`
     );
 
@@ -709,7 +722,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const password = await seedDemo(dbPool);
   if (password) {
     console.log(
-      `Demo accounts created. Password: ${password}\nAdmin: admin@botaniq.local\nStaff: mika@botaniq.local, paolo@botaniq.local, sam@botaniq.local`
+      `Demo accounts created. Password: ${password}\nAdmin: admin@gmail.com\nStaff: heavenashley@gmail.com, andreifurton@gmail.com, johntayag@gmail.com`
     );
   }
   const port = Number(process.env.PORT || 3000);

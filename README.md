@@ -28,7 +28,7 @@ BotaniQ is a database-driven web application for managing the Center for Urban A
 
 The app is intentionally lightweight: a vanilla HTML/CSS/JavaScript front end served by a small Node.js HTTP backend on top of PostgreSQL. There is no front-end framework and no build step.
 
-> **Note:** All seeded people, crops, plots, and tasks are fictional demonstration records.
+> **Note:** Seeded crops, plots, and tasks are fictional demonstration records.
 
 ## Features
 
@@ -99,21 +99,24 @@ npm start
 
 Then open **http://localhost:3000**. Do not open `index.html` directly, because sign-in and records need the server.
 
-On the first run against an empty database the app seeds fictional demo data and prints the demo password to the terminal once. Sign in with:
+On the first run against an empty database the app seeds demo garden data and these accounts. All four initial passwords are `123`:
 
-| Role | Email |
-| --- | --- |
-| Administrator | `admin@botaniq.local` |
-| Staff | `mika@botaniq.local`, `paolo@botaniq.local`, `sam@botaniq.local` |
+| Name | Email | Role |
+| --- | --- | --- |
+| Admin Admin | `admin@gmail.com` | Admin |
+| Heaven Ashley De Paz | `heavenashley@gmail.com` | Staff |
+| Brent Andrei Leur Furton | `andreifurton@gmail.com` | Staff |
+| John Bernard Bacani | `johntayag@gmail.com` | Staff |
 
-Use the account button at the top right to change your password after signing in. Passwords must be 12 to 128 characters.
+Existing installations replace the four original demo accounts on the next server start or API request. Their record IDs and garden history are retained, and their sessions are revoked. Later password changes are preserved.
+
+Use the account button at the top right to change your password after signing in. New accounts and password changes still require 12 to 128 characters. The shared initial password `123` is insecure for public use.
 
 ### Environment variables
 
 | Variable | Required | Description |
 | --- | :---: | --- |
 | `DATABASE_URL` | Yes | PostgreSQL connection string. SSL is enabled automatically unless the URL contains `localhost`. |
-| `DEMO_PASSWORD` | No | Password assigned to the seeded demo accounts. **Set this explicitly** rather than relying on the built-in fallback. |
 | `PORT` | No | Local server port. Defaults to `3000`. |
 | `COOKIE_SECURE` | No | Set to `true` behind HTTPS to mark session cookies as `Secure`. |
 
@@ -130,7 +133,7 @@ To deploy:
 
 1. Provision a hosted PostgreSQL database and run `schema.sql` against it.
 2. Import the repository into Vercel.
-3. Add `DATABASE_URL` (and optionally `DEMO_PASSWORD`) as environment variables.
+3. Add `DATABASE_URL` as an environment variable.
 4. Deploy.
 
 For a persistent-server deployment instead, run `npm start` behind a trusted HTTPS reverse proxy and set `COOKIE_SECURE=true`. Replace the demo accounts and data before real use.
@@ -200,6 +203,14 @@ Botaniq/
 ```
 
 ## Testing
+
+Run the focused account seed and replacement checks (using a mock database client):
+
+```bash
+node --test test/accounts.test.js
+```
+
+Run the full suite:
 
 ```bash
 npm test
