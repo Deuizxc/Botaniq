@@ -15,16 +15,46 @@ const localDate = value => value?.includes('T')
   ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value))
   : dateOf(value);
 
+export const assignedPending = (tasks, userId) => tasks.filter(t => t.status === 'Pending' && t.assigned_staff_id === userId);
+
+export function notificationKeys(state) {
+  return state.user.role === 'Admin'
+    ? [...state.tasks.filter(t=>t.is_flagged_for_admin).map(t=>`takeover-${t.task_id}`), ...(state.messages||[]).filter(m=>!m.read_at).map(m=>`message-${m.message_id}`)]
+    : assignedPending(state.tasks,state.user.user_id).map(t=>`task-${t.task_id}-${t.scheduled_date}-${t.scheduled_time}`);
+}
+
+export function taskPeriod(scheduled, today) {
+  if (scheduled < today) return 'Overdue';
+  if (scheduled === today) return 'Today';
+  const now = new Date(`${today}T00:00:00Z`);
+  const endOfWeek = new Date(now.getTime() + (7 - (now.getUTCDay() || 7)) * 86400000).toISOString().slice(0, 10);
+  if (scheduled <= endOfWeek) return 'This week';
+  const endOfNextWeek = new Date(Date.parse(endOfWeek) + 7 * 86400000).toISOString().slice(0, 10);
+  return scheduled <= endOfNextWeek ? 'Next week' : 'Later';
+}
+
+export function calendarMonth(today, offset, tasks) {
+  const start = new Date(`${today.slice(0, 7)}-01T00:00:00Z`);
+  start.setUTCMonth(start.getUTCMonth() + offset);
+  const year = start.getUTCFullYear(), month = start.getUTCMonth();
+  const cells = Array.from({length:start.getUTCDay()}, () => null);
+  for (let day=1; day<=new Date(Date.UTC(year,month+1,0)).getUTCDate(); day++) {
+    const date = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    cells.push({day,date,count:tasks.filter(t=>t.scheduled_date===date&&t.status==='Pending').length});
+  }
+  return {label:start.toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'}),cells};
+}
+
 export function plotOverview(state, plot, cycle, until = '9999-12-31') {
   const start = cycle ? (cycle.current_plot_id === plot.plot_id && cycle.transplanted_date || cycle.planted_date) : '';
   const inRange = value => localDate(value) >= start && localDate(value) <= until;
   const entry = (state.entries || []).find(e => e.plot_id === plot.plot_id && e.cycle_id === (cycle?.cycle_id ?? null) && localDate(e.recorded_at) <= until);
   const watering = latest(state.tasks.filter(t => t.plot_id === plot.plot_id && t.task_type === 'Manual watering' && t.status === 'Completed' && t.completed_at && inRange(t.completed_at)), 'completed_at');
-  const fertilizer = latest(state.nutrients.filter(n => n.plot_id === plot.plot_id && n.nutrient_type === 'Fertilizer' && inRange(n.application_date)), 'application_date');
+  const fertilizer = latest(state.nutrients.filter(n => n.plot_id === plot.plot_id && n.nutrient_type === 'Fertilizer' && inRange(n.application_date)).map(n=>({...n,application_time:n.applied_at||n.application_date})), 'application_time');
   const harvest = latest(state.cycles.filter(c => c.current_plot_id === plot.plot_id && c.harvest_date && c.harvest_date <= until), 'harvest_date');
   const newerWatering = watering && (!entry || watering.completed_at > entry.recorded_at);
   const newerHarvest = harvest && (!entry || harvest.harvest_date > localDate(entry.recorded_at));
-  const newerFertilizer = fertilizer && (!entry || fertilizer.application_date > localDate(entry.recorded_at));
+  const newerFertilizer = fertilizer && (!entry || (fertilizer.applied_at ? fertilizer.applied_at > entry.recorded_at : fertilizer.application_date > localDate(entry.recorded_at)));
   return {
     cycle_id: cycle?.cycle_id ?? null,
     crop_name: cycle?.crop_name || 'Ready for a new chapter',
@@ -34,7 +64,7 @@ export function plotOverview(state, plot, cycle, until = '9999-12-31') {
     watered_at: newerWatering ? watering.completed_at : entry ? entry.watered_at : watering?.completed_at || null,
     harvested_at: newerHarvest ? harvest.harvest_date : entry ? entry.harvested_at : harvest?.harvest_date || null,
     fertilizer: newerFertilizer ? fertilizer.product : entry ? entry.fertilizer : fertilizer?.product || null,
-    fertilized_at: newerFertilizer ? fertilizer.application_date : entry ? entry.fertilized_at : fertilizer?.application_date || null
+    fertilized_at: newerFertilizer ? fertilizer.application_time : entry ? entry.fertilized_at : fertilizer?.application_time || null
   };
 }
 
@@ -44,7 +74,11 @@ export function plotHistory(state, plot) {
     crop_name: state.cycles.find(c => c.cycle_id === e.cycle_id)?.crop_name || 'Between crops'
   }));
   const cycles = state.cycles.filter(c => c.current_plot_id === plot.plot_id && c.harvest_date || c.origin_plot_id === plot.plot_id && c.current_plot_id !== plot.plot_id);
-  return [...snapshots, ...cycles.map(c => {
+  const applications = state.nutrients.filter(n=>n.plot_id===plot.plot_id).map(n=>{
+    const cycle = state.cycles.find(c=>c.current_plot_id===plot.plot_id && c.planted_date<=n.application_date && (!c.harvest_date||c.harvest_date>=n.application_date));
+    return {key:`nutrient-${n.log_id}`,date:n.application_date,type:n.nutrient_type==='Fertilizer'?'Fertilizer applied':'Nutrients applied',crop_name:cycle?.crop_name||'Garden care',description:`${n.product}${n.full_name?` · Recorded by ${n.full_name}`:''}${n.notes?`. ${n.notes}`:''}`,fertilizer:n.product,fertilized_at:n.applied_at||n.application_date,watered_at:null,harvested_at:null};
+  });
+  return [...snapshots, ...applications, ...cycles.map(c => {
     const moved = c.current_plot_id !== plot.plot_id;
     const end = moved ? c.transplanted_date : c.harvest_date;
     return { ...plotOverview(state, plot, c, end), key: `cycle-${c.cycle_id}`, date: end, type: moved ? 'Transplanted' : 'Harvested' };

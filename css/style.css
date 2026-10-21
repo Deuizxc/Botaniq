@@ -1605,3 +1605,83 @@ dialog::backdrop {
   .login-background {display:block}.login-photo-copy p {display:block;font-size:30px}.login-photo-copy {left:24px;right:24px}
 }
 @media(prefers-reduced-motion:reduce) {*,*:before,*:after {animation:none!important;transition:none!important}}
+
+/* Four equal metric columns; the task queue and calendar share the same outer edges. */
+:root {font-family:"Segoe UI",Arial,sans-serif;--muted:#596653}
+.main {max-width:1440px}
+.page-heading h1 {font-size:30px}
+.page-heading p {font-size:14px}
+.care-stats {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:24px}
+.care-stats .stat {background:#e9eee1;border:0;border-radius:8px;padding:22px;box-shadow:none}
+.care-stats .stat-top {font-size:14px;color:var(--dark)}
+.care-stats .stat-value {font-size:36px;font-weight:400;margin:12px 0;color:var(--dark)}
+.care-stats .stat-foot {font-size:13px;color:#596653}
+.care-grid {display:grid;grid-template-columns:minmax(0,1.4fr) minmax(290px,1fr);gap:24px;align-items:start}
+.care-grid .panel {border:0;background:#fff;border-radius:8px;box-shadow:none}
+.care-row {display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;border-top:1px solid var(--line)}
+.care-row a {font-size:13px;font-weight:600;color:#4b602e}
+.care-row h3 {margin:6px 0;font-size:16px}
+.care-row p {font-size:13px;color:var(--muted)}
+.care-row>div:last-child {display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.queue-more {padding:16px 24px;font-size:13px;color:var(--muted)}
+.team-row {display:flex;align-items:center;gap:12px;padding:16px 24px;font-size:14px;border-top:1px solid var(--line)}
+.team-row>span:nth-child(2) {flex:1}.team-row strong {font-weight:500;font-variant-numeric:tabular-nums}.team-summary>.btn {margin:16px 24px}
+.task-calendar {padding:20px}.calendar-heading {display:flex;align-items:center;justify-content:space-between;gap:12px}
+.calendar-heading h2 {font-size:18px}.calendar-heading button {font-size:24px;min-height:44px;min-width:44px}
+.task-calendar>p {font-size:13px;line-height:1.6;color:var(--muted);margin:12px 0}
+.calendar-grid {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:20px}
+.calendar-weekday {font-size:12px;text-align:center;color:var(--muted);padding-bottom:10px}
+.calendar-day {position:relative;min-height:44px;background:transparent;border-radius:6px;color:var(--dark);font-size:14px}
+.calendar-day.has-tasks {background:#dfe9c7;font-weight:600;color:#2b431c}
+.calendar-day.selected {outline:2px solid var(--green);outline-offset:-2px}
+.calendar-day[aria-current=date] {text-decoration:underline;text-underline-offset:5px}
+.calendar-day:hover {outline:1px solid #839773;outline-offset:-1px}
+.calendar-mark {position:absolute;width:4px;height:4px;background:#426529;bottom:4px;left:calc(50% - 2px);border-radius:50%}
+.calendar-legend {display:flex;align-items:center;gap:8px}.calendar-legend span {width:12px;height:12px;background:#dfe9c7;border-radius:3px}
+.task-board {background:#fff;border-radius:8px;padding:0 24px 20px}
+.task-toolbar {display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:76px;border-bottom:1px solid var(--line)}
+.task-toolbar .filters {background:none;padding:0;gap:16px}.task-toolbar .filter {border-radius:0;padding:20px 4px;background:transparent;font-size:15px;color:var(--muted);border-bottom:3px solid transparent}
+.task-toolbar .filter.active {border-bottom-color:var(--green);color:var(--dark)}
+.task-toolbar>p {font-size:14px;color:var(--muted)}
+.task-scope {display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
+.task-scope select {font-size:14px;padding:10px 12px;min-height:44px;border:1px solid #a3af95;border-radius:4px;background:#fff;color:var(--dark);max-width:100%}
+.task-group>summary {display:flex;align-items:center;gap:16px;cursor:pointer;padding:24px 0;list-style:none}
+.task-group>summary h2 {flex:1;font-size:18px}.task-group>summary span {font-size:14px;color:var(--muted)}
+.task-group-empty {font-size:14px;color:var(--muted);padding:0 0 20px}
+.task-item {border-top:1px solid var(--line)}
+.task-item>summary {display:flex;align-items:center;gap:16px;cursor:pointer;list-style:none;padding:20px 0;min-height:88px}
+.task-item>summary::-webkit-details-marker,.task-group>summary::-webkit-details-marker {display:none}
+.task-item>summary:hover {background:#f5f7f1}
+.task-symbol {display:flex;color:#68765c}.task-identity {flex:1;min-width:0}
+.task-identity strong {font-size:16px;font-weight:600;display:block}.task-identity>span {display:block;font-size:14px;color:var(--muted);margin-top:6px}
+.task-due {text-align:right;font-size:14px;font-variant-numeric:tabular-nums}.task-due small {display:block;font-size:12px;color:var(--muted);margin-top:6px}
+.task-detail {padding:0 0 24px 36px;font-size:14px;line-height:1.7}.task-detail .actions {margin-top:16px}
+.task-detail>p>a {text-decoration:underline;text-underline-offset:3px}
+.task-fab {display:none}.notification-body {padding:0 24px 24px}.notification-body>h3 {margin:16px 0}.private-message {white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dark)!important}
+.map-entrance text {font-size:16px;fill:#405a31}.map-entrance path {stroke:#405a31;stroke-width:2;fill:none}
+.plot-task-alert circle {fill:#f4e5ac;stroke:#765a0a;stroke-width:1.5}.plot-task-alert text {fill:#503a00;font-size:18px;font-weight:700;text-anchor:middle;stroke:none}
+.map-controls {display:flex;gap:8px;align-items:center;flex-shrink:0}.map-controls .icon-button {width:44px;height:44px;background:#edf1e4;font-size:23px;border-radius:6px}.map-controls .btn {min-height:44px}
+.map-picker select {min-height:44px;max-width:230px;font-size:14px}.map-key {font-size:12px;color:#516347}.map-key .task-key:before {display:none}
+.map-world {transition:transform .22s ease-out}
+.nav a {min-height:44px}.nav a.active {background:#e8ece2;color:var(--dark)}
+.nav a.active:after {display:none}
+.panel-head p,.profile small,.sub,.footer {color:#596653}
+.field label {font-size:14px}.field input,.field select,.field textarea {font-size:16px;min-height:44px}
+.badge {font-size:12px;white-space:nowrap;flex-shrink:0}
+.eyebrow {font-size:12px;letter-spacing:0;text-transform:none;color:#596653}
+.inspector-heading .eyebrow,.plot-facts dt,.plot-facts dd small,.plot-state>span:last-child,.history-search label,.history-search p,.history-count,.history-entry summary small,.search-tokens button {font-size:12px;letter-spacing:0;color:#596653}
+.plot-story p,.plot-facts dd,.history-entry strong,.history-search input,.history-search select,.history-filter summary {font-size:14px;color:var(--dark)}
+.main.view-enter,.inspector-content {animation:view-in .16s ease-out}
+@keyframes view-in {from {opacity:.6;transform:translateY(5px)}to {opacity:1;transform:translateY(0)}}
+@media(max-width:1100px) {.care-grid {grid-template-columns:1fr}.task-calendar {max-width:none}.calendar-grid {gap:8px}.calendar-day {min-height:48px}}
+@media(max-width:600px) {
+  .page-heading h1 {font-size:26px}.care-stats {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.care-stats .stat {padding:18px}.care-stats .stat-value {font-size:30px}
+  .care-row {padding:18px;gap:12px}.care-row>div:last-child {max-width:115px}.care-grid {gap:20px}
+  .task-board {padding:0 16px 20px}.task-toolbar {flex-wrap:wrap;gap:4px;padding-bottom:14px}.task-toolbar .filters {gap:20px}.task-toolbar .filter {padding:18px 4px}
+  .task-item>summary {flex-wrap:wrap;gap:10px}.task-symbol {display:none}.task-identity {flex-basis:calc(100% - 95px)}.task-due {max-width:95px;font-size:12px}.task-detail {padding-left:0}.task-item>summary>.badge {margin-top:2px}.task-chevron {margin-left:auto}
+  .task-fab {display:flex;align-items:center;justify-content:center;position:fixed;right:22px;bottom:24px;width:56px;height:56px;border-radius:50%;background:var(--green);color:#fff;z-index:5;box-shadow:0 4px 16px #243b2b33}.task-fab svg {width:26px;height:26px}
+  .main:has(.task-fab) {padding-bottom:100px}.main:has(.task-fab) .heading-actions {display:none}
+  .map-bottom {flex-wrap:wrap}.map-controls {width:100%;justify-content:flex-end}.map-key {font-size:12px}.map-picker select {max-width:180px}
+  .login-photo-copy p {font-size:24px}.task-calendar {padding:16px}.calendar-grid {gap:2px}
+  #toast {max-width:calc(100vw - 32px);white-space:normal;bottom:90px;font-size:14px}
+}
