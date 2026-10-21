@@ -123,9 +123,17 @@ const seededPools = new WeakSet();
 async function migrateGardenMap(client) {
   await client.query('CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY)');
   const applied = await client.query("SELECT name FROM schema_migrations WHERE name='001-garden-map'");
-  if (applied.rows.length) return;
-  await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
-  await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
+  if (!applied.rows.length) {
+    await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
+    await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
+  }
+  for (const name of ['002-accounts']) {
+    const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
+    if (!done.rows.length) {
+      await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
+      await client.query('INSERT INTO schema_migrations(name) VALUES($1)', [name]);
+    }
+  }
 }
 
 export async function seedDemo(dbPool, today = gardenDate()) {
@@ -134,7 +142,7 @@ export async function seedDemo(dbPool, today = gardenDate()) {
   try {
     const password = '123';
     const accounts = [
-      ['Admin Admin', 'admin@gmail.com', 'Admin', 'admin@botaniq.local'],
+      ['CUIA Admin', 'admin@gmail.com', 'Admin', 'admin@botaniq.local'],
       ['Heaven Ashley De Paz', 'heavenashley@gmail.com', 'Staff', 'mika@botaniq.local'],
       ['Brent Andrei Leur Furton', 'andreifurton@gmail.com', 'Staff', 'paolo@botaniq.local'],
       ['John Bernard Bacani', 'johntayag@gmail.com', 'Staff', 'sam@botaniq.local']
@@ -506,8 +514,8 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       admin(user);
       const email = required(b.email, 'Email', 150).toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail('Enter a valid email.');
-      if (typeof b.password !== 'string' || b.password.length < 12 || b.password.length > 128) {
-        fail('Password must contain 12–128 characters.');
+      if (typeof b.password !== 'string' || b.password.length < 8 || b.password.length > 128) {
+        fail('Password must contain 8–128 characters.');
       }
       await baseDb.run(
         'INSERT INTO users(full_name,email,password_hash,role) VALUES(?,?,?,?)',
@@ -516,17 +524,36 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         hashPassword(b.password),
         choice(b.role, ['Admin', 'Staff'])
       );
-    } else if (path === '/api/user-status') {
+    } else if (path === '/api/remove-user') {
       admin(user);
-      if (identifier(b.user_id) === user.user_id) fail('You cannot deactivate your own account.');
-      if (typeof b.active !== 'boolean') fail('Invalid account status.');
-      const result = await baseDb.run(
-        'UPDATE users SET active=? WHERE user_id=?',
-        b.active ? 1 : 0,
-        identifier(b.user_id)
-      );
-      if (!result.changes) fail('User not found.', 404);
-      await baseDb.run('DELETE FROM sessions WHERE user_id=?', identifier(b.user_id));
+      const id = identifier(b.user_id);
+      if (id === user.user_id) fail('You cannot remove your own account.');
+      await transaction(async tx => {
+        await tx.run('LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
+        if (!await tx.get('SELECT user_id FROM users WHERE user_id=? AND active=1', user.user_id)) fail('Please sign in again.', 401);
+        // Retain the author identity for permanent garden history, but remove access and contact details.
+        const result = await tx.run('UPDATE users SET active=0,removed_at=?,email=?,password_hash=? WHERE user_id=? AND removed_at IS NULL', new Date().toISOString(), `removed-${id}@removed.invalid`, hashPassword(randomBytes(32).toString('hex')), id);
+        if (!result.changes) fail('Account not found.', 404);
+        await tx.run('DELETE FROM sessions WHERE user_id=?', id);
+        await tx.run("UPDATE maintenance_tasks SET assigned_staff_id=NULL WHERE assigned_staff_id=? AND status='Pending'", id);
+        await tx.run('UPDATE crop_cycles SET assigned_staff_id=NULL WHERE assigned_staff_id=? AND harvest_date IS NULL', id);
+      });
+    } else if (path === '/api/profile') {
+      const name = required(b.full_name, 'Full name', 100);
+      const email = required(b.email, 'Email', 150).toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail('Enter a valid email.');
+      const changingPassword = b.password !== undefined && b.password !== '';
+      if (changingPassword && (typeof b.password !== 'string' || b.password.length < 8 || b.password.length > 128)) fail('Password must contain 8–128 characters.');
+      let signedOut = false;
+      await transaction(async tx => {
+        const current = await tx.get('SELECT * FROM users WHERE user_id=? AND active=1 FOR UPDATE', user.user_id);
+        if (!current) fail('Please sign in again.', 401);
+        signedOut = changingPassword || email !== current.email.toLowerCase();
+        if (signedOut && (typeof b.current_password !== 'string' || b.current_password.length > 128 || !verifyPassword(b.current_password, current.password_hash))) fail('Current password is incorrect.');
+        await tx.run('UPDATE users SET full_name=?,email=?,password_hash=? WHERE user_id=?', name, email, changingPassword ? hashPassword(b.password) : current.password_hash, user.user_id);
+        if (signedOut) await tx.run('DELETE FROM sessions WHERE user_id=?', user.user_id);
+      });
+      return { ok: true, signed_out: signedOut };
     } else if (path === '/api/password') {
       const current = await baseDb.get('SELECT password_hash FROM users WHERE user_id=?', user.user_id);
       if (
@@ -536,8 +563,8 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       ) {
         fail('Current password is incorrect.');
       }
-      if (typeof b.password !== 'string' || b.password.length < 12 || b.password.length > 128) {
-        fail('Password must contain 12–128 characters.');
+      if (typeof b.password !== 'string' || b.password.length < 8 || b.password.length > 128) {
+        fail('Password must contain 8–128 characters.');
       }
       await transaction(async tx => {
         await tx.run('UPDATE users SET password_hash=? WHERE user_id=?', hashPassword(b.password), user.user_id);
@@ -693,7 +720,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         const [plots, plants, users, cycles, tasks, adjustments, nutrients, entries] = await Promise.all([
           baseDb.all('SELECT * FROM plots ORDER BY plot_code'),
           baseDb.all('SELECT * FROM plants ORDER BY crop_name'),
-          baseDb.all(`SELECT user_id,full_name,role,active${isAdmin ? ',email' : ''} FROM users ORDER BY full_name`),
+          baseDb.all(`SELECT user_id,full_name,role,active${isAdmin ? ',email' : ''} FROM users WHERE removed_at IS NULL ORDER BY full_name`),
           baseDb.all('SELECT * FROM cycle_details ORDER BY planted_date DESC'),
           baseDb.all(
             'SELECT t.*,p.plot_code,p.zone,u.full_name AS assigned_staff,s.full_name AS substitute_staff FROM maintenance_tasks t JOIN plots p ON t.plot_id=p.plot_id LEFT JOIN users u ON t.assigned_staff_id=u.user_id LEFT JOIN users s ON t.substitute_staff_id=s.user_id ORDER BY scheduled_date,scheduled_time'

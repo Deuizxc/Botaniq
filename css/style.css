@@ -275,6 +275,13 @@ small {
   padding-left:22px;
   color:inherit
 }
+.profile-wrap {position:relative}
+.profile-menu {position:absolute;right:0;top:calc(100% + 12px);width:260px;max-width:calc(100vw - 32px);padding:20px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px #243b2b20;z-index:20}
+.profile-menu[hidden] {display:none}
+.profile-menu strong,.profile-menu span {display:block;overflow-wrap:anywhere}
+.profile-menu span {font-size:13px;color:#596653;margin:6px 0 12px}
+.profile-menu .btn {width:100%;justify-content:flex-start;min-height:44px}
+.btn.danger {color:#9b3030}
 .avatar {
   width:35px;
   height:35px;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { scryptSync } from 'node:crypto';
 
 const accounts = [
-  ['Admin Admin', 'admin@gmail.com', 'Admin', 'admin@botaniq.local'],
+  ['CUIA Admin', 'admin@gmail.com', 'Admin', 'admin@botaniq.local'],
   ['Heaven Ashley De Paz', 'heavenashley@gmail.com', 'Staff', 'mika@botaniq.local'],
   ['Brent Andrei Leur Furton', 'andreifurton@gmail.com', 'Staff', 'paolo@botaniq.local'],
   ['John Bernard Bacani', 'johntayag@gmail.com', 'Staff', 'sam@botaniq.local']

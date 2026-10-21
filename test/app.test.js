@@ -17,6 +17,28 @@ async function fixture(t) {
   async function login(email='admin@gmail.com') {const response=await request('/api/login',{email,password});assert.equal(response.status,200);return response.cookie;}
   return {db,request,login,password};
 }
+test('profiles validate security changes and removal preserves history without access',async t=>{
+  const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
+  const profile={full_name:'Heaven De Paz',email:'heavenashley@gmail.com'};
+  assert.equal((await request('/api/profile',profile,staff)).status,200);
+  assert.equal((await request('/api/profile',{...profile,email:'new@example.com'},staff)).status,400);
+  assert.equal((await request('/api/profile',{...profile,password:'1234567',current_password:'123'},staff)).status,400);
+  const changed=await request('/api/profile',{...profile,password:'newpass8',current_password:'123'},staff);
+  assert.equal(changed.status,200);assert.equal(changed.body.signed_out,true);
+  assert.equal((await request('/api/state',undefined,staff)).status,401);
+  const next=await request('/api/login',{email:profile.email,password:'newpass8'});
+  assert.equal(next.status,200);
+  assert.equal((await request('/api/remove-user',{user_id:3},next.cookie)).status,403);
+  assert.equal((await request('/api/users',{full_name:'Eight Character',email:'eight@example.com',role:'Staff',password:'12345678'},admin)).status,200);
+  assert.equal((await request('/api/users',{full_name:'Short Password',email:'short@example.com',role:'Staff',password:'1234567'},admin)).status,400);
+  assert.equal((await request('/api/remove-user',{user_id:2},admin)).status,200);
+  assert.equal((await request('/api/state',undefined,next.cookie)).status,401);
+  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM crop_cycles')).n,7);
+  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM nutrient_logs')).n,1);
+  assert.equal((await db.get('SELECT assigned_staff_id FROM maintenance_tasks WHERE task_id=1')).assigned_staff_id,null);
+  assert.ok(!(await request('/api/state',undefined,admin)).body.users.some(u=>u.user_id===2));
+  assert.equal((await request('/api/remove-user',{user_id:2},admin)).status,404);
+});
 test('authenticated state, role boundaries, and static files protect database records',async t=>{
   const {request,login}=await fixture(t);
   assert.equal((await request('/api/state')).status,401);
@@ -89,8 +111,8 @@ test('harvest, replacement, assignment and date validation preserve history',asy
 });
 test('account management, password changes and session revocation are enforced',async t=>{
   const {request,login,password}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
-  assert.equal((await request('/api/user-status',{user_id:1,active:false},admin)).status,400);
-  assert.equal((await request('/api/user-status',{user_id:2,active:false},admin)).status,200);
+  assert.equal((await request('/api/remove-user',{user_id:1},admin)).status,400);
+  assert.equal((await request('/api/remove-user',{user_id:2},admin)).status,200);
   assert.equal((await request('/api/state',undefined,staff)).status,401);
   assert.equal((await request('/api/login',{email:'heavenashley@gmail.com',password})).status,401);
   assert.equal((await request('/api/users',{full_name:'Test Staff',email:'test@example.com',role:'Staff',password:'a strong new password '},admin)).status,200);
