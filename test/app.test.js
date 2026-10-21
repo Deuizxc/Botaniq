@@ -48,7 +48,32 @@ test('authenticated state, role boundaries, and static files protect database re
   assert.ok(state.body.users.every(u=>!('password_hash' in u)));
   assert.equal((await request('/api/plots',{plot_code:'OP-99',zone:'Outdoor'},staff)).status,403);
   for(const path of ['/data/botaniq.sqlite','/schema.sql','/server.js','/.git/config']) assert.equal((await request(path)).status,404);
-  for(const path of ['/','/edit-plot.html','/staff-dashboard.html','/css/style.css','/js/script.js','/js/garden.js','/img/testinglang.png']) assert.equal((await request(path)).status,200);
+  for(const path of ['/','/login.html','/edit-plot.html','/staff-dashboard.html','/css/style.css','/js/script.js','/js/garden.js','/img/testinglang.png','/img/qcu.png','/img/login_bg.png']) assert.equal((await request(path)).status,200);
+});
+test('staff messages stay private to admins, including through state and read endpoints',async t=>{
+  const {request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com'),other=await login('andreifurton@gmail.com');
+  assert.equal((await request('/api/task-message',{task_id:3,message:'Not my task'},staff)).status,403);
+  assert.equal((await request('/api/task-message',{task_id:1,message:'   '},staff)).status,400);
+  assert.equal((await request('/api/task-message',{task_id:1,message:'The hose needs repair.'},staff)).status,200);
+  assert.deepEqual((await request('/api/state',undefined,other)).body.messages,[]);
+  assert.deepEqual((await request('/api/state',undefined,staff)).body.messages,[]);
+  const messages=(await request('/api/state',undefined,admin)).body.messages;
+  assert.equal(messages.length,1);assert.equal(messages[0].message,'The hose needs repair.');
+  assert.equal((await request('/api/read-message',{message_id:messages[0].message_id},other)).status,403);
+  assert.equal((await request('/api/read-message',{message_id:messages[0].message_id},admin)).status,200);
+  assert.ok((await request('/api/state',undefined,admin)).body.messages[0].read_at);
+});
+test('fertilizer task completion records its application atomically once',async t=>{
+  const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com'),other=await login('andreifurton@gmail.com');
+  assert.equal((await request('/api/tasks',{plot_id:1,task_type:'Fertilizer application',scheduled_date:'2026-10-19',scheduled_time:'08:00',assigned_staff_id:2},admin)).status,200);
+  const task=(await db.get('SELECT MAX(task_id) AS id FROM maintenance_tasks')).id;
+  assert.equal((await request('/api/complete',{task_id:task,product:'Compost'},other)).status,403);
+  assert.equal((await request('/api/complete',{task_id:task},staff)).status,400);
+  assert.equal((await db.get(`SELECT status FROM maintenance_tasks WHERE task_id=${task}`)).status,'Pending');
+  assert.equal((await request('/api/complete',{task_id:task,product:'Compost',notes:'Around roots'},staff)).status,200);
+  assert.equal((await request('/api/complete',{task_id:task,product:'Compost'},staff)).status,409);
+  const application=await db.get(`SELECT * FROM nutrient_logs WHERE task_id=${task}`);
+  assert.equal(application.product,'Compost');assert.equal(application.nutrient_type,'Fertilizer');assert.equal(application.staff_id,2);assert.ok(application.applied_at);
 });
 test('42-day harvest boundary has no gap and never removes permanent history',async t=>{
   const {db,request,login}=await fixture(t),admin=await login();

@@ -127,7 +127,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts']) {
+  for (const name of ['002-accounts', '003-task-care']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
@@ -424,9 +424,19 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         time(b.scheduled_time),
         assignedStaff
       );
+    } else if (path === '/api/task-message') {
+      if (user.role !== 'Staff') fail('Only staff can send a task message.', 403);
+      const task = await baseDb.get('SELECT * FROM maintenance_tasks WHERE task_id=?', identifier(b.task_id));
+      if (!task) fail('Task not found.', 404);
+      if (![task.assigned_staff_id, task.substitute_staff_id].includes(user.user_id)) fail('You can message the admin about your own tasks only.', 403);
+      await baseDb.run('INSERT INTO task_messages(task_id,staff_id,message,created_at) VALUES(?,?,?,?)', task.task_id, user.user_id, required(b.message, 'Message', 1000), new Date().toISOString());
+    } else if (path === '/api/read-message') {
+      admin(user);
+      const result = await baseDb.run('UPDATE task_messages SET read_at=? WHERE message_id=?', new Date().toISOString(), identifier(b.message_id));
+      if (!result.changes) fail('Message not found.', 404);
     } else if (['/api/complete', '/api/takeover', '/api/adjust', '/api/task-assignment'].includes(path)) {
       await transaction(async tx => {
-        const task = await tx.get('SELECT * FROM maintenance_tasks WHERE task_id=?', identifier(b.task_id));
+        const task = await tx.get('SELECT * FROM maintenance_tasks WHERE task_id=? FOR UPDATE', identifier(b.task_id));
         if (!task) fail('Task not found.', 404);
         if (task.status !== 'Pending') fail('This task is already closed.', 409);
         if (path === '/api/task-assignment') {
@@ -486,6 +496,9 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
               );
             }
           }
+        }
+        if (['/api/complete', '/api/takeover'].includes(path) && ['Fertilizer application', 'Hydroponic nutrients'].includes(task.task_type)) {
+          await tx.run('INSERT INTO nutrient_logs(plot_id,staff_id,application_date,nutrient_type,product,notes,task_id,applied_at) VALUES(?,?,?,?,?,?,?,?)', task.plot_id, user.user_id, today(), task.task_type === 'Fertilizer application' ? 'Fertilizer' : 'Hydroponic nutrient', required(b.product, 'Fertilizer or nutrient product', 120), String(b.notes || '').slice(0, 500), task.task_id, new Date().toISOString());
         }
       });
     } else if (path === '/api/review') {
@@ -720,7 +733,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         const currentToday = today();
         const cutoff = shiftDays(currentToday, -42);
 
-        const [plots, plants, users, cycles, tasks, adjustments, nutrients, entries] = await Promise.all([
+        const [plots, plants, users, cycles, tasks, adjustments, nutrients, entries, messages] = await Promise.all([
           baseDb.all('SELECT * FROM plots ORDER BY plot_code'),
           baseDb.all('SELECT * FROM plants ORDER BY crop_name'),
           baseDb.all(`SELECT user_id,full_name,role,active${isAdmin ? ',email' : ''} FROM users WHERE removed_at IS NULL ORDER BY full_name`),
@@ -734,7 +747,8 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           baseDb.all(
             'SELECT n.*,p.plot_code,u.full_name FROM nutrient_logs n JOIN plots p ON n.plot_id=p.plot_id JOIN users u ON n.staff_id=u.user_id ORDER BY application_date DESC,log_id DESC'
           ),
-          baseDb.all('SELECT * FROM plot_entries ORDER BY entry_id DESC')
+          baseDb.all('SELECT * FROM plot_entries ORDER BY entry_id DESC'),
+          isAdmin ? baseDb.all('SELECT m.*,u.full_name,p.plot_code,t.task_type FROM task_messages m JOIN users u ON m.staff_id=u.user_id JOIN maintenance_tasks t ON m.task_id=t.task_id JOIN plots p ON t.plot_id=p.plot_id ORDER BY m.message_id DESC') : Promise.resolve([])
         ]);
 
         json({
@@ -748,7 +762,8 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           tasks,
           adjustments,
           nutrients,
-          entries
+          entries,
+          messages
         });
         return;
       }
