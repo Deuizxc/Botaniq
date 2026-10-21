@@ -1029,76 +1029,6 @@ dd {
   margin-top:7px;
   overflow-wrap:anywhere
 }
-.login {
-  min-height:100vh;
-  display:grid;
-  grid-template-columns:1fr 1fr
-}
-.login-art {
-  background:#263e2c;
-  color:#f1f3e6;
-  padding:50px 65px;
-  display:flex;
-  flex-direction:column;
-  justify-content:space-between;
-  overflow:hidden
-}
-.login-art .brand {
-  padding:0
-}
-.login-art h1 {
-  font-family:Georgia,serif;
-  font-size:58px;
-  line-height:1.1;
-  font-weight:400;
-  margin:40px 0 20px;
-  max-width:450px
-}
-.login-art p {
-  font-size:14px;
-  color:#bdccb0;
-  line-height:1.9;
-  max-width:370px
-}
-.login-art .garden-art {
-  width:80%;
-  height:auto;
-  margin:30px 0
-}
-.login-art small {
-  font-size:10px;
-  color:#b2c2a8;
-  letter-spacing:1px
-}
-.login-form {
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  padding:40px
-}
-.login-box {
-  max-width:370px;
-  width:100%
-}
-.login-box h2 {
-  font-size:29px;
-  margin:10px 0 12px
-}
-.login-box>p {
-  font-size:13px;
-  color:#8a9481;
-  line-height:1.8;
-  margin-bottom:30px
-}
-.login-box .btn {
-  width:100%;
-  margin-top:10px;
-  padding:13px
-}
-.login-box .login-foot {
-  font-size:11px;
-  margin-top:25px
-}
 .field {
   display:grid;
   gap:8px;
@@ -1612,3 +1542,66 @@ dialog::backdrop {
   .has-selection .map-viewport {height:300px}
 }
 @media(prefers-reduced-motion:reduce) {.plot-inspector {animation:none}.map-world {transition:none}}
+
+/* The public pages use the university's own seal, garden photograph and green palette. */
+.boot {min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#f5f6f1;color:var(--dark);font-size:20px}
+.boot span {font-size:14px;color:#596653}
+.growing-plant {width:110px;height:140px;stroke:var(--green);stroke-width:3;fill:none}
+.plant-stem {stroke-dasharray:90;stroke-dashoffset:0;animation:stem-grow .5s ease-out both}
+.plant-leaf {transform-box:fill-box;transform-origin:bottom center;animation:leaf-grow .4s ease-out both}
+.leaf-one {animation-delay:.2s}.leaf-two {animation-delay:.35s}.leaf-three {animation-delay:.5s}.leaf-four {animation-delay:.65s}
+@keyframes stem-grow {from {stroke-dashoffset:90}}
+@keyframes leaf-grow {from {transform:scale(0);opacity:0}to {transform:scale(1);opacity:1}}
+.landing {background:#f5f6f1;color:var(--dark)}
+.landing-header,.landing-intro,.landing-footer {padding-inline:clamp(24px,5vw,80px)}
+.landing-header {display:flex;align-items:center;justify-content:space-between;gap:24px;padding-block:24px}
+.university {display:flex;align-items:center;gap:20px}
+.university img {object-fit:contain}
+.university strong {display:block;font-size:22px;font-weight:600}
+.university small {display:block;font-size:16px;margin-top:5px}
+.landing .btn {border-radius:4px;padding:16px 28px;font-size:16px;background:#53651b;color:#fff}
+.landing-intro {display:grid;grid-template-columns:1.2fr 1fr;gap:64px;align-items:center;padding-block:75px}
+.landing h1 {font:600 clamp(52px,6.7vw,100px)/1.02 Georgia,serif;letter-spacing:-.04em;color:var(--dark)}
+.landing-copy>p:first-child {font:400 clamp(24px,2.3vw,34px)/1.25 Georgia,serif;margin-bottom:22px}
+.landing-copy>p {font-size:18px;line-height:1.65;max-width:40ch}
+.landing-link {display:inline-flex;align-items:center;gap:12px;font-weight:600;font-size:16px;margin-top:24px;min-height:44px}
+.landing-photo {position:relative;margin:0;overflow:hidden}
+.landing-photo>img {display:block;width:100%;height:440px;object-fit:cover;object-position:center 74%}
+.landing-photo figcaption {position:absolute;bottom:24px;left:clamp(24px,5vw,80px);padding:12px 18px;background:var(--dark);color:#fff;font-size:16px}
+.landing-footer {display:flex;align-items:center;justify-content:space-between;gap:24px;padding-block:36px}
+.landing-footer p {font-size:14px;line-height:1.6}
+.landing-footer .brand {padding:0;color:var(--dark)}
+.login {display:grid;grid-template-columns:1fr 1fr;min-height:100svh;background:#eef1e6;padding:16px;gap:16px}
+.login-form {display:flex;align-items:center;justify-content:center;padding:36px;background:#eef1e6}
+.login-box {width:100%;max-width:400px}
+.login-back {display:inline-flex;min-height:44px;align-items:center;font-size:14px;margin-bottom:24px;color:#4c5b44}
+.login-seal {display:block;object-fit:contain;margin-bottom:20px}
+.login-box .brand {padding:0;color:var(--dark);margin-bottom:36px;font-size:34px}
+.login-box h1 {font:400 clamp(28px,2.6vw,38px)/1.15 Georgia,serif;letter-spacing:-.025em;margin-bottom:14px}
+.login-box>p {font-size:16px;line-height:1.6;color:#4c5b44;margin-bottom:28px}
+.login-box .field label {font-size:14px;color:var(--dark)}
+.login-box .field input {min-height:50px;background:#fafbf7;border-color:#a3af95;font-size:16px;border-radius:4px}
+.login-box .btn {width:100%;min-height:50px;margin-top:8px;border-radius:4px;font-size:16px}
+.login-box .login-foot {font-size:14px;margin:24px 0 0}
+.login-art {position:relative;min-height:650px;overflow:hidden;background:var(--dark);border-radius:8px}
+.login-background {position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.login-art:after {content:'';position:absolute;inset:0;background:#17371969}
+.login-photo-copy {position:absolute;bottom:60px;left:40px;right:40px;z-index:1;color:#fff;background:#1d352bc9;padding:24px}
+.login-photo-copy p {font:400 clamp(25px,2.8vw,40px)/1.15 Georgia,serif;margin-bottom:24px}
+.login-photo-copy span {font-size:16px}
+.btn,.landing-link {transition:transform .15s ease,opacity .15s ease}
+.btn:hover,.landing-link:hover {transform:translateY(-1px)}
+.btn:active {transform:translateY(1px)}
+@media(max-width:900px) {
+  .landing-intro {gap:32px;padding-block:54px}.university strong {font-size:18px}.university small {font-size:14px}
+  .login-form {padding:24px}.login-photo-copy {left:24px;right:24px;bottom:32px;padding:20px}
+}
+@media(max-width:600px) {
+  .landing-header {padding-block:16px;gap:14px}.university {gap:10px}.university img {width:44px;height:44px}.university strong {font-size:14px;max-width:130px}.university small {display:none}
+  .landing .btn {font-size:14px;padding:12px 14px;white-space:nowrap}.landing .btn svg {display:none}
+  .landing-intro {grid-template-columns:1fr;gap:28px;padding-block:38px}.landing h1 {font-size:58px}.landing-copy>p:first-child {font-size:26px;margin-bottom:16px}.landing-copy>p {font-size:16px}
+  .landing-photo>img {height:340px}.landing-photo figcaption {right:24px;bottom:20px;font-size:14px}.landing-footer {align-items:flex-start}.landing-footer p {max-width:145px}
+  .login {display:flex;flex-direction:column;padding:0;gap:0}.login-form {padding:24px;min-height:100svh}.login-art {display:block;min-height:360px;border-radius:0}.login-box {max-width:400px}
+  .login-background {display:block}.login-photo-copy p {display:block;font-size:30px}.login-photo-copy {left:24px;right:24px}
+}
+@media(prefers-reduced-motion:reduce) {*,*:before,*:after {animation:none!important;transition:none!important}}

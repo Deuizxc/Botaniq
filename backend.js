@@ -601,6 +601,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         const pages = [
           '/',
           '/index.html',
+          '/login.html',
           '/admin-dashboard.html',
           '/staff-dashboard.html',
           '/plot-info.html',
@@ -616,6 +617,8 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           '/js/script.js': ['js/script.js', 'text/javascript'],
           '/js/garden.js': ['js/garden.js', 'text/javascript'],
           '/img/testinglang.png': ['img/testinglang.png', 'image/png']
+          ,'/img/qcu.png': ['img/qcu.png', 'image/png']
+          ,'/img/login_bg.png': ['img/login_bg.png', 'image/png']
         };
         const asset = pages.includes(path) ? ['index.html', 'text/html'] : assets[path];
         if (!asset) fail('Page not found.', 404);

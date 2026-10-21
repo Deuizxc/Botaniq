@@ -45,16 +45,20 @@ function textarea(label,name) { return `<div class="field wide"><label for="f-${
 async function api(path,body) {
   const response=await fetch(`/api/${path}`,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const result=await response.json();
-  if(!response.ok) { if(response.status===401 && path!=='login') { state=null;renderLogin(); } throw new Error(result.error); }
+  if(!response.ok) { if(response.status===401 && path!=='login' && state) { state=null;renderLogin(); } throw new Error(result.error); }
   return result;
 }
 function toast(message) { $('#toast').textContent=message;$('#toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('visible'),4500); }
 function getView() { return ({'tasks.html':'tasks','plot-info.html':'plots','edit-plot.html':'plots','inventory.html':'inventory','staff.html':'staff','archive.html':'plots','nutrients.html':'nutrients'})[location.pathname.split('/').pop()] || 'dashboard'; }
 const href = name => ({dashboard:isAdmin()?'admin-dashboard.html':'staff-dashboard.html',plots:'plot-info.html',tasks:'tasks.html',inventory:'inventory.html',staff:'staff.html',nutrients:'nutrients.html'})[name];
+function renderLanding() {
+  document.title='BotaniQ · QCU garden care';
+  $('#app').innerHTML=`<div class="landing"><header class="landing-header"><a class="university" href="/"><img src="/img/qcu.png" alt="Quezon City University seal" width="76" height="76"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><a class="btn" href="login.html">Get started ${icon('arrow')}</a></header><main><section class="landing-intro"><div><h1>Welcome to<br>BotaniQ</h1></div><div class="landing-copy"><p>A shared garden.<br>A little care, every day.</p><p>Keep QCU’s garden growing with clear tasks, planting schedules, and a record of every crop.</p><a href="login.html" class="landing-link">Open your garden workspace ${icon('arrow')}</a></div></section><figure class="landing-photo"><img src="/img/login_bg.png" alt="Vegetable beds and greenhouses at Quezon City University" width="778" height="825"><figcaption>Rooted in our campus. Growing together.</figcaption></figure></main><footer class="landing-footer"><a class="brand" href="/">${icon('leaf')}<span>BotaniQ</span></a><p>Garden tracking & care<br>Quezon City University</p></footer></div>`;
+}
 function renderLogin() {
-  $('#modal').close();
-  $('#app').innerHTML=`<div class="login"><section class="login-art"><a class="brand" href="/">${icon('leaf')}<span>BotaniQ<small>↗</small></span></a><div><div class="eyebrow">A little care. A greener tomorrow.</div><h1>Good things<br>take growing.</h1><p>A shared space to care for our garden, keep track of every crop, and make each day a little greener.</p>${art}</div><small>CUAI · QUEZON CITY UNIVERSITY</small></section><section class="login-form"><div class="login-box"><div class="eyebrow">Your garden workspace</div><h2>Welcome back.</h2><p>Sign in to see what’s growing and what needs your care.</p><form id="login-form">${field('Email address','email','email','','required autocomplete="username" placeholder="you@botaniq.local"')}${field('Password','password','password','','required autocomplete="current-password" maxlength="128"')}<div class="form-error" role="alert"></div><button class="btn" type="submit">Sign in ${icon('arrow')}</button></form><p class="login-foot">Authorized garden staff only. For the local demo, use the account details printed in the server terminal.</p></div></section></div>`;
-  $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,submit=form.querySelector('button');submit.disabled=true;try{await api('login',Object.fromEntries(new FormData(form)));await refresh();}catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}});
+  $('#modal').close();document.title='BotaniQ · Log in';
+  $('#app').innerHTML=`<main class="login"><section class="login-form"><div class="login-box"><a class="login-back" href="/">← Back to the garden</a><img class="login-seal" src="/img/qcu.png" alt="Quezon City University seal" width="78" height="78"><a class="brand" href="/">${icon('leaf')}<span>BotaniQ<small>↗</small></span></a><h1>Let’s grow together.</h1><p>Log in to care for your plots and see what needs you today.</p><form id="login-form">${field('Email address','email','email','','required autocomplete="username" placeholder="Your email address"')}${field('Password','password','password','','required autocomplete="current-password" maxlength="128"')}<div class="form-error" role="alert"></div><button class="btn" type="submit">Log in ${icon('arrow')}</button></form><p class="login-foot">New to the garden? Ask your administrator for a staff account.</p></div></section><section class="login-art" aria-label="The QCU campus garden"><img class="login-background" src="/img/login_bg.png" alt="QCU campus gardens and greenhouses" width="778" height="825"><div class="login-photo-copy"><p>Good care today.<br>A greener campus tomorrow.</p><span>Quezon City University</span></div></section></main>`;
+  $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,submit=form.querySelector('button');submit.disabled=true;try{await api('login',Object.fromEntries(new FormData(form)));await refresh();history.replaceState({},'',href('dashboard'));toast('Welcome back. Your garden is ready.');}catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}});
 }
 function shell() {
   const names={dashboard:'Overview',plots:'Garden plots',tasks:'Maintenance tasks',inventory:'Plant inventory',staff:'Staff & access',nutrients:'Nutrient log'};
@@ -304,7 +308,7 @@ document.addEventListener('click',async event=>{
   const profileMenu=$('#profile-menu');
   if(profileMenu&&!event.target.closest('.profile-wrap')){profileMenu.hidden=true;$('.profile').setAttribute('aria-expanded','false');}
   const anchor=event.target.closest('a');
-  if(anchor&&state&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&anchor.origin===location.origin) {event.preventDefault();navigate(anchor.getAttribute('href'));return;}
+  if(anchor&&state&&!['/','/index.html','/login.html'].includes(anchor.pathname)&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&anchor.origin===location.origin) {event.preventDefault();navigate(anchor.getAttribute('href'));return;}
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id}=target.dataset;
   try {
@@ -324,9 +328,14 @@ document.addEventListener('click',async event=>{
     if(action==='account'){
       const menu=$('#profile-menu');menu.hidden=!menu.hidden;target.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)menu.querySelector('button').focus();return;
     }
-    if(action==='logout'){await api('logout',{});state=null;renderLogin();return;}
+    if(action==='logout'){await api('logout',{});state=null;history.pushState({},'','login.html');renderLogin();return;}
     openForm(action,id);
   }catch(error){target.disabled=false;toast(error.message);}
 });
-window.addEventListener('popstate',()=>{if(state){view=getView();search='';shell();}});
-try{await refresh();}catch(error){if(!state)renderLogin();if(error.message!=='Please sign in to continue.')toast(error.message);}
+window.addEventListener('popstate',()=>{if(['/','/index.html'].includes(location.pathname)){renderLanding();}else if(state){view=getView();search='';shell();}else renderLogin();});
+const landingRoute=['/','/index.html'].includes(location.pathname);
+try {
+  const [loaded]=await Promise.all([api('state').catch(error=>{if(error.message!=='Please sign in to continue.')toast(error.message);return null;}),new Promise(resolve=>setTimeout(resolve,landingRoute&&!matchMedia('(prefers-reduced-motion: reduce)').matches?1000:0))]);
+  state=loaded;
+  if(landingRoute)renderLanding();else if(state){view=getView();shell();}else renderLogin();
+} catch(error){renderLogin();toast(error.message);}
