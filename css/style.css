@@ -1495,3 +1495,113 @@ dialog::backdrop {
     scroll-behavior:auto!important
   }
 }
+
+/* The atlas uses the same sage, cream, and forest palette as the workspace. */
+.garden-map {position:relative;background:#f9faf5;border:1px solid var(--line);border-radius:14px;overflow:hidden;isolation:isolate}
+.map-caption {display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 26px;border-bottom:1px solid #e3e9db;background:#fff}
+.map-caption>span:last-child {display:flex;align-items:center;gap:7px;font-size:11px;color:#7b8871}
+.map-caption svg {width:15px;height:15px}
+.map-picker {margin-left:auto}
+.map-picker select {max-width:180px;padding:8px 10px;border:1px solid #dce4d1;border-radius:6px;background:#f9fbf5;color:#607451;font-size:11px;min-height:36px}
+.map-viewport {height:clamp(500px,65vh,740px);overflow:hidden;background:#edf1e4}
+.map-svg {display:block;width:100%;height:100%;stroke:none;fill:initial}
+.map-world {transform-origin:0 0;transition:transform .65s cubic-bezier(.22,.68,.15,1)}
+.map-ground {fill:#e9eedf}
+.map-path-edge {stroke:#d4ddc5;stroke-width:29;fill:none}
+.map-path {stroke:#fbf9ed;stroke-width:21;fill:none}
+.map-landmarks {fill:#d8e3c6;stroke:#c1cfae;stroke-width:1.5}
+.map-landmarks text {font-size:10px;letter-spacing:2px;fill:#809369;stroke:none;text-anchor:middle}
+.map-compass {fill:#617751;stroke:none}
+.map-compass text {font-size:12px;text-anchor:middle}
+.map-plot {cursor:pointer;outline:none;transition:opacity .2s}
+.map-plot.dimmed {opacity:.22}
+.plot-shape {fill:#68865d;stroke:#54764e;stroke-width:2;filter:drop-shadow(0 4px 1px #455a3520);transition:fill .2s,stroke .2s}
+.map-plot.outdoor .plot-shape {fill:#ad8a63;stroke:#9e7c56}
+.map-plot.nursery .plot-shape {fill:#8ba566;stroke:#7f985b}
+.map-plot.vacant .plot-shape {fill:#cbd8bd;stroke:#8aa077;stroke-dasharray:6 4}
+.map-plot.outdoor.vacant .plot-shape {fill:#dfd2ba;stroke:#ad946f}
+.map-plot:hover .plot-shape,.map-plot:focus-visible .plot-shape {stroke:#253f2a;stroke-width:4;filter:drop-shadow(0 5px 3px #455a3540)}
+.map-plot[aria-pressed=true] .plot-shape {stroke:#fff;stroke-width:5;filter:drop-shadow(0 0 6px #33583d80)}
+.map-plot-label {fill:#fff;stroke:none;font-size:16px;font-weight:650;text-anchor:middle;pointer-events:none}
+.map-plot-code {font-size:11px;font-weight:450}
+.map-plot.vacant .map-plot-label {fill:#40563a}
+.plot-texture,.plot-status {pointer-events:none}
+.plot-status {fill:#dbe8ae;stroke:#ffffffa0;stroke-width:1}
+.map-plot.vacant .plot-status {fill:#f8faef}
+.map-plot.harvested .plot-status {fill:#f2cf7c}
+.map-site-label {font-size:11px;letter-spacing:3px;fill:#849675;stroke:none}
+.map-bottom {padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:#fff}
+.map-key {display:flex;flex-wrap:wrap;gap:12px;font-size:10px;color:#76856d}
+.map-key span:before {content:'';display:inline-block;width:10px;height:8px;border-radius:3px;background:#68865d;margin-right:5px}
+.map-key .outdoor-key:before {background:#ad8a63}
+.map-key .nursery-key:before {background:#8ba566}
+.map-key .vacant-key:before {background:transparent;border:1px dashed #8aa077}
+.garden-map.compact {border:0;border-radius:0}
+.compact .map-viewport {height:400px}
+.compact .map-caption {padding:14px 22px}
+.compact .map-caption>span:last-child {display:none}
+.compact .map-picker select {max-width:145px}
+.compact .map-bottom {padding:12px 22px}
+.compact .map-bottom button {display:none}
+.plot-inspector {position:absolute;top:80px;bottom:88px;right:20px;width:min(355px,43%);background:#fff;border:1px solid #dce4d2;border-radius:12px;box-shadow:0 16px 48px #263e2c26;display:flex;flex-direction:column;animation:inspector-in .3s ease-out;z-index:2}
+.plot-inspector[hidden] {display:none}
+.plot-inspector.on-left {left:20px;right:auto}
+.inspector-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 20px 12px}
+.inspector-heading h2 {font-size:25px;margin-top:5px;letter-spacing:-.6px}
+.inspector-heading .eyebrow {font-size:9px;letter-spacing:1.3px}
+.inspector-buttons {display:flex;gap:3px}
+.inspector-buttons button {background:#f2f5eb;border-radius:7px}
+.inspector-buttons svg {height:16px;width:16px}
+.inspector-tabs {flex-shrink:0}
+.inspector-tabs .tab {font-size:12px}
+.inspector-content {overflow-y:auto;overscroll-behavior:contain;padding:18px 20px 22px;min-height:0;scrollbar-width:thin;scrollbar-color:#bac8ad transparent}
+.plot-photo {width:100%;height:145px;object-fit:cover;object-position:center 35%;border-radius:8px;display:block;background:#edf1e5}
+.plot-story {margin:17px 0}
+.plot-story h3 {font-size:18px;letter-spacing:-.4px}
+.plot-story p {font-size:12px;line-height:1.8;color:#7b8872;margin-top:8px;overflow-wrap:anywhere}
+.plot-facts {display:block;margin:0}
+.plot-facts>div {border-top:1px solid #e9ede2;padding:12px 0}
+.plot-facts dt {display:flex;align-items:center;gap:7px;font-size:10px;margin:0 0 6px;color:#829174}
+.plot-facts dt svg {height:14px;width:14px}
+.plot-facts dd {font-size:12px;padding-left:21px;overflow-wrap:anywhere}
+.plot-facts dd small {display:block;font-size:10px;color:#7c8a71;margin-top:5px}
+.plot-state {display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:14px;margin-top:5px}
+.plot-state>span:last-child {font-size:9px;color:#8b967f}
+.plot-edit-actions {display:flex;justify-content:flex-end;gap:8px}
+.editor-note {font-size:11px;line-height:1.7;color:#7b8872;margin-bottom:16px}
+.plot-crop-actions {border-top:1px solid var(--line);margin-top:22px;padding-top:18px;display:flex;flex-wrap:wrap;gap:9px}
+.plot-crop-actions>.eyebrow {flex-basis:100%;margin-bottom:5px}
+.history-search label {display:flex;align-items:center;gap:6px;font-size:11px;color:#607451}
+.history-search label svg {width:15px;height:15px}
+.history-search input,.history-search select {border:1px solid #dce4d1;border-radius:6px;padding:9px;font-size:11px;color:var(--dark);background:#f9fbf6;width:100%;min-width:0;margin-top:7px}
+.history-search p {font-size:10px;line-height:1.7;color:#829173;margin-top:8px}
+.search-tokens {display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.search-tokens button {background:#edf2e4;border-radius:4px;font-size:10px;color:#637a50;padding:5px 7px}
+.history-filter {border-top:1px solid var(--line);padding-top:12px;margin-top:14px}
+.history-filter summary {font-size:11px;color:#5c734b;cursor:pointer}
+.history-filter label {display:block;margin-top:10px}
+.history-dates {display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.history-count {font-size:10px;color:#8b977f;padding:18px 0 8px}
+.history-entry {border-bottom:1px solid var(--line)}
+.history-entry>summary {display:flex;align-items:center;gap:10px;padding:15px 0;cursor:pointer;list-style:none}
+.history-entry>summary::-webkit-details-marker {display:none}
+.history-dot {height:8px;width:8px;border-radius:50%;background:#9fb87d;box-shadow:0 0 0 4px #eff4e7;flex-shrink:0}
+.history-entry strong {display:block;font-size:12px;font-weight:550}
+.history-entry summary small {display:block;font-size:10px;color:#89967e;margin-top:5px}
+.history-expand {margin-left:auto;font-size:18px;color:#7e9469}
+.history-entry[open] .history-expand {transform:rotate(45deg)}
+.history-entry-body {padding:0 0 15px}
+.history-entry-body .plot-photo {height:115px}
+.history-entry-body .plot-story h3 {font-size:16px}
+@keyframes inspector-in {from {opacity:0;translate:0 10px} to {opacity:1;translate:0 0}}
+@media(max-width:1100px) {.plot-inspector {width:330px;max-width:46%}.map-caption>span:last-child {font-size:10px}.map-plot-code {font-size:9px}}
+@media(max-width:700px) {
+  .map-caption {padding:17px}.map-caption>span:last-child {display:none}
+  .map-viewport {height:430px}.compact .map-viewport {height:350px}
+  .map-bottom {padding:13px;gap:8px}.map-key {font-size:9px;gap:8px}
+  .map-plot-label {font-size:18px}.map-plot-code {display:none}
+  .plot-inspector,.plot-inspector.on-left {position:relative;top:auto;bottom:auto;left:auto;right:auto;width:auto;max-width:none;margin:0 12px 15px;max-height:600px;box-shadow:0 5px 18px #263e2c12}
+  .plot-inspector .plot-photo {height:180px}.inspector-content {max-height:470px}
+  .has-selection .map-viewport {height:300px}
+}
+@media(prefers-reduced-motion:reduce) {.plot-inspector {animation:none}.map-world {transition:none}}

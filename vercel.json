@@ -1,5 +1,8 @@
 {
   "framework": null,
+  "functions": {
+    "api/index.js": { "includeFiles": "migrations/**" }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.js" },
     { "source": "/admin-dashboard.html", "destination": "/index.html" },

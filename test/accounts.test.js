@@ -59,7 +59,7 @@ test('existing accounts retain their IDs and revoke the replaced users sessions'
     assert.doesNotMatch(call.sql, /SET user_id/);
   });
   assert.deepEqual(calls.filter(c => c.sql.startsWith('DELETE FROM sessions')).map(c => c.values), [[1], [2], [3], [4]]);
-  assert.equal(calls.some(c => c.sql.startsWith('INSERT INTO')), false);
+  assert.equal(calls.some(c => c.sql.startsWith('INSERT INTO users')), false);
   assert.equal(calls[0].sql, 'BEGIN');
   assert.equal(calls[1].sql, 'LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE');
   assert.equal(calls.at(-1).sql, 'COMMIT');

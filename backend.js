@@ -119,9 +119,17 @@ export function getPool() {
   return pool;
 }
 
-let seeded = false;
+const seededPools = new WeakSet();
+async function migrateGardenMap(client) {
+  await client.query('CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY)');
+  const applied = await client.query("SELECT name FROM schema_migrations WHERE name='001-garden-map'");
+  if (applied.rows.length) return;
+  await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
+  await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
+}
+
 export async function seedDemo(dbPool, today = gardenDate()) {
-  if (seeded) return null;
+  if (seededPools.has(dbPool)) return null;
   const client = await dbPool.connect();
   try {
     const password = '123';
@@ -145,8 +153,9 @@ export async function seedDemo(dbPool, today = gardenDate()) {
           await client.query('DELETE FROM sessions WHERE user_id=$1', [user.user_id]);
         }
       }
+      await migrateGardenMap(client);
       await client.query('COMMIT');
-      seeded = true;
+      seededPools.add(dbPool);
       return null;
     }
     const day = offset => shiftDays(today, offset);
@@ -225,8 +234,9 @@ export async function seedDemo(dbPool, today = gardenDate()) {
       day(-2)
     );
 
+    await migrateGardenMap(client);
     await client.query('COMMIT');
-    seeded = true;
+    seededPools.add(dbPool);
     return password;
   } catch (error) {
     await client.query('ROLLBACK');
@@ -295,10 +305,37 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         String(b.variety || '').slice(0, 80),
         String(b.notes || '').slice(0, 500)
       );
+    } else if (path === '/api/plot-entry') {
+      admin(user);
+      const description = required(b.description, 'Description', 500);
+      const timestamp = (value, label) => {
+        if (value === null || value === '') return null;
+        if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}\.\d{3}Z)?$/.test(value)) fail(`Enter a valid ${label}.`);
+        date(value.slice(0, 10));
+        if (!Number.isFinite(Date.parse(value)) || value.includes('T') && new Date(value).toISOString() !== value) fail(`Enter a valid ${label}.`);
+        if (value.includes('T') ? Date.parse(value) > Date.now() : value > today()) fail(`${label} cannot be in the future.`);
+        return value;
+      };
+      const watered = timestamp(b.watered_at, 'watering time');
+      const harvested = timestamp(b.harvested_at, 'harvest time');
+      const fertilizer = b.fertilizer === null || b.fertilizer === '' ? null : required(b.fertilizer, 'Fertilizer', 120);
+      const fertilized = timestamp(b.fertilized_at, 'fertilizer time');
+      if (Boolean(fertilizer) !== Boolean(fertilized)) fail('Choose None, or supply both fertilizer and application time.');
+      await transaction(async tx => {
+        const p = await tx.get('SELECT * FROM plots WHERE plot_id=? FOR UPDATE', identifier(b.plot_id));
+        if (!p) fail('Plot not found.', 404);
+        const cycle = await tx.get('SELECT cycle_id FROM crop_cycles WHERE current_plot_id=? AND harvest_date IS NULL', p.plot_id);
+        const expectedCycle = b.cycle_id === null ? null : identifier(b.cycle_id);
+        if ((cycle?.cycle_id ?? null) !== expectedCycle) fail('The crop changed while you were editing. Reopen the plot and try again.', 409);
+        await tx.run(
+          'INSERT INTO plot_entries(plot_id,cycle_id,description,watered_at,harvested_at,fertilizer,fertilized_at,recorded_at,recorded_by) VALUES(?,?,?,?,?,?,?,?,?)',
+          p.plot_id, expectedCycle, description, watered, harvested, fertilizer, fertilized, new Date().toISOString(), user.user_id
+        );
+      });
     } else if (path === '/api/plots') {
       admin(user);
       await baseDb.run(
-        'INSERT INTO plots(plot_code,zone) VALUES(?,?)',
+        'INSERT INTO plots(plot_code,zone,map_slot) VALUES(?,?,(SELECT COALESCE(MAX(map_slot),27)+1 FROM plots))',
         required(b.plot_code, 'Plot code', 30),
         choice(b.zone, ['Outdoor', 'Greenhouse', 'Nursery'])
       );
@@ -549,7 +586,9 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         ];
         const assets = {
           '/css/style.css': ['css/style.css', 'text/css'],
-          '/js/script.js': ['js/script.js', 'text/javascript']
+          '/js/script.js': ['js/script.js', 'text/javascript'],
+          '/js/garden.js': ['js/garden.js', 'text/javascript'],
+          '/img/testinglang.png': ['img/testinglang.png', 'image/png']
         };
         const asset = pages.includes(path) ? ['index.html', 'text/html'] : assets[path];
         if (!asset) fail('Page not found.', 404);
@@ -651,17 +690,11 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         const currentToday = today();
         const cutoff = shiftDays(currentToday, -42);
 
-        const [plots, plants, users, cycles, archive, tasks, adjustments, nutrients] = await Promise.all([
+        const [plots, plants, users, cycles, tasks, adjustments, nutrients, entries] = await Promise.all([
           baseDb.all('SELECT * FROM plots ORDER BY plot_code'),
           baseDb.all('SELECT * FROM plants ORDER BY crop_name'),
           baseDb.all(`SELECT user_id,full_name,role,active${isAdmin ? ',email' : ''} FROM users ORDER BY full_name`),
-          baseDb.all(
-            'SELECT * FROM cycle_details WHERE harvest_date IS NULL OR harvest_date>=? ORDER BY planted_date DESC',
-            cutoff
-          ),
-          isAdmin
-            ? baseDb.all('SELECT * FROM cycle_details WHERE harvest_date<? ORDER BY harvest_date DESC', cutoff)
-            : Promise.resolve([]),
+          baseDb.all('SELECT * FROM cycle_details ORDER BY planted_date DESC'),
           baseDb.all(
             'SELECT t.*,p.plot_code,p.zone,u.full_name AS assigned_staff,s.full_name AS substitute_staff FROM maintenance_tasks t JOIN plots p ON t.plot_id=p.plot_id LEFT JOIN users u ON t.assigned_staff_id=u.user_id LEFT JOIN users s ON t.substitute_staff_id=s.user_id ORDER BY scheduled_date,scheduled_time'
           ),
@@ -670,7 +703,8 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           ),
           baseDb.all(
             'SELECT n.*,p.plot_code,u.full_name FROM nutrient_logs n JOIN plots p ON n.plot_id=p.plot_id JOIN users u ON n.staff_id=u.user_id ORDER BY application_date DESC,log_id DESC'
-          )
+          ),
+          baseDb.all('SELECT * FROM plot_entries ORDER BY entry_id DESC')
         ]);
 
         json({
@@ -681,10 +715,10 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           plants,
           users,
           cycles,
-          archive,
           tasks,
           adjustments,
-          nutrients
+          nutrients,
+          entries
         });
         return;
       }
