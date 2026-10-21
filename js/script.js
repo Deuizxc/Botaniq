@@ -117,7 +117,7 @@ function gardenMap(compact=false) {
         <path class="map-path-edge" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
         <path class="map-path" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
         <g class="map-landmarks"><circle cx="515" cy="215" r="48"/><circle cx="515" cy="215" r="33"/><rect x="222" y="170" width="77" height="98" rx="20"/><text x="260" y="225">GROW</text><text x="515" y="220">REST</text></g>
-        <g class="map-entrance"><text x="638" y="628">Entrance</text><path d="M713 623h58m-8-7 8 7-8 7"/></g>
+        <g class="map-entrance"><text x="638" y="674">Entrance</text><path d="M713 669h17m-8-7 8 7-8 7"/></g>
         ${state.plots.map(p=>{
           const slot=p.map_slot||p.plot_id,[x,y,w,h]=mapPosition(slot),c=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);
           const muted=(zone!=='All zones'&&zone!==p.zone)||!match([p.plot_code,p.zone,c?.crop_name||'']);
