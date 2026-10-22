@@ -632,6 +632,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           '/img/testinglang.png': ['img/testinglang.png', 'image/png'],
           '/img/qcu.png': ['img/qcu.png', 'image/png'],
           '/img/login_bg.png': ['img/login_bg.png', 'image/png']
+          '/img/favicon.png': ['img/favicon.png', 'image/png'] 
         };
         const asset = pages.includes(path) ? ['index.html', 'text/html'] : assets[path];
         if (!asset) fail('Page not found.', 404);
