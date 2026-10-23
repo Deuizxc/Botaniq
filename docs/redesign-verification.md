@@ -1,5 +1,16 @@
 # BotaniQ redesign verification
 
+## October 23 reference update
+
+- Applied the supplied landing, login, logo, and flower-header assets while retaining the existing navigation.
+- Missing tasks display directly and cannot be completed or taken over through either the UI or API. Admin task details show staff weather observations, with no completion or adjustment buttons.
+- Admins can filter tasks by staff or view all assignments, and the atlas has an unfinished-task sidebar. Selected maps support pointer dragging and arrow-key panning; deselection resets the view.
+- Both roles can type crop names or varieties into the catalog dropdown. Crop uniqueness now uses the trimmed, case-insensitive name/variety pair; migration 004 preserves plants and cycle references.
+- Browser checks used an isolated in-memory database: public pages, both overviews, missing-task actions, admin filtering, crop search, weather adjustment delivery from staff to admin, map dragging/reset, accounts, and phone-width tasks/map. No console errors or horizontal overflow were observed in those checks.
+- `npm test`: **31 passed, 0 failed**. Coverage includes page rendering, static asset routes, missing-task rejection, same-name varieties, and migration preservation. JavaScript syntax checks and `git diff --check` also pass. Production deployment was not checked.
+
+## Previous verification
+
 Verified locally on October 22, 2026 using an isolated PGlite demo database. No production records were changed during testing.
 
 ## Delivered

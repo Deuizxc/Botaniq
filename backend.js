@@ -127,7 +127,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts', '003-task-care']) {
+  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
@@ -310,7 +310,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       await baseDb.run(
         'INSERT INTO plants(crop_name,variety,notes) VALUES(?,?,?)',
         required(b.crop_name, 'Crop name', 80),
-        String(b.variety || '').slice(0, 80),
+        String(b.variety || '').trim().slice(0, 80),
         String(b.notes || '').slice(0, 500)
       );
     } else if (path === '/api/plot-entry') {
@@ -439,6 +439,9 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         const task = await tx.get('SELECT * FROM maintenance_tasks WHERE task_id=? FOR UPDATE', identifier(b.task_id));
         if (!task) fail('Task not found.', 404);
         if (task.status !== 'Pending') fail('This task is already closed.', 409);
+        if (['/api/complete', '/api/takeover'].includes(path) && task.scheduled_date < today()) {
+          fail('Missing tasks cannot be completed.', 409);
+        }
         if (path === '/api/task-assignment') {
           admin(user);
           const assignedStaff = await staff(tx, b.assigned_staff_id);
@@ -631,6 +634,12 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           '/js/garden.js': ['js/garden.js', 'text/javascript'],
           '/img/testinglang.png': ['img/testinglang.png', 'image/png'],
           '/img/qcu.png': ['img/qcu.png', 'image/png'],
+          '/img/qculogo.png': ['img/qculogo.png', 'image/png'],
+          '/img/Logo.png': ['img/Logo.png', 'image/png'],
+          '/img/landing_botaniq.png': ['img/landing_botaniq.png', 'image/png'],
+          '/img/landing_welcomemsg.png': ['img/landing_welcomemsg.png', 'image/png'],
+          '/img/landingpage_bg.png': ['img/landingpage_bg.png', 'image/png'],
+          '/img/mainpage_bg.png': ['img/mainpage_bg.png', 'image/png'],
           '/img/login_bg.png': ['img/login_bg.png', 'image/png'],
           '/img/favicon.png': ['img/favicon.png', 'image/png'] 
         };

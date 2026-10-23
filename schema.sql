@@ -17,10 +17,12 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE TABLE IF NOT EXISTS plants (
   plant_id SERIAL PRIMARY KEY,
-  crop_name CITEXT NOT NULL UNIQUE,
+  crop_name CITEXT NOT NULL,
   variety TEXT NOT NULL DEFAULT '',
   notes TEXT NOT NULL DEFAULT ''
 );
+CREATE UNIQUE INDEX IF NOT EXISTS plants_name_variety_key
+  ON plants (LOWER(BTRIM(crop_name::text)), LOWER(BTRIM(variety)));
 
 CREATE TABLE IF NOT EXISTS plots (
   plot_id SERIAL PRIMARY KEY,

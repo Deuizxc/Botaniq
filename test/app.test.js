@@ -48,7 +48,7 @@ test('authenticated state, role boundaries, and static files protect database re
   assert.ok(state.body.users.every(u=>!('password_hash' in u)));
   assert.equal((await request('/api/plots',{plot_code:'OP-99',zone:'Outdoor'},staff)).status,403);
   for(const path of ['/data/botaniq.sqlite','/schema.sql','/server.js','/.git/config']) assert.equal((await request(path)).status,404);
-  for(const path of ['/','/login.html','/edit-plot.html','/staff-dashboard.html','/css/style.css','/js/script.js','/js/garden.js','/img/testinglang.png','/img/qcu.png','/img/login_bg.png']) assert.equal((await request(path)).status,200);
+  for(const path of ['/','/login.html','/edit-plot.html','/staff-dashboard.html','/css/style.css','/js/script.js','/js/garden.js','/img/testinglang.png','/img/qcu.png','/img/login_bg.png','/img/qculogo.png','/img/Logo.png','/img/landing_botaniq.png','/img/landing_welcomemsg.png','/img/landingpage_bg.png','/img/mainpage_bg.png']) assert.equal((await request(path)).status,200);
 });
 test('staff messages stay private to admins, including through state and read endpoints',async t=>{
   const {request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com'),other=await login('andreifurton@gmail.com');
@@ -149,7 +149,10 @@ test('account management, password changes and session revocation are enforced',
 test('catalog, scheduling and nutrient logs validate trust boundaries',async t=>{
   const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
   assert.equal((await request('/api/plants',{crop_name:'Eggplant',variety:'Long purple',notes:'Transplant when ready.'},admin)).status,200);
-  assert.equal((await request('/api/plants',{crop_name:'Eggplant'},admin)).status,409);
+  assert.equal((await request('/api/plants',{crop_name:'Eggplant',variety:'Round'},admin)).status,200);
+  assert.equal((await request('/api/plants',{crop_name:' eggplant ',variety:' LONG PURPLE '},admin)).status,409);
+  assert.equal((await request('/api/plants',{crop_name:'Eggplant'},admin)).status,200);
+  assert.equal((await request('/api/plants',{crop_name:'Eggplant',variety:'  '},admin)).status,409);
   assert.equal((await request('/api/plots',{plot_code:'OP-05',zone:'Outdoor'},admin)).status,200);
   assert.equal((await request('/api/tasks',{plot_id:9,task_type:'Manual watering',scheduled_date:'2026-10-19',scheduled_time:'25:00',assigned_staff_id:2},admin)).status,400);
   assert.equal((await request('/api/tasks',{plot_id:9,task_type:'Manual watering',scheduled_date:'2026-10-19',scheduled_time:'16:00',assigned_staff_id:2},admin)).status,200);
@@ -205,4 +208,28 @@ test('plot entries are admin-only, validated, persistent snapshots visible to st
   assert.equal(state.entries[1].description,'Bok choy growing well.');
   assert.equal(state.entries[1].fertilizer,'Compost');
   assert.ok(state.cycles.some(c=>c.harvest_date&&c.harvest_date<state.cutoff));
+});
+
+test('missing tasks cannot be completed or taken over by either role',async t=>{
+  const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
+  await db.query("UPDATE maintenance_tasks SET scheduled_date='2026-10-18' WHERE task_id IN (1,3)");
+  for(const cookie of [admin,staff]) {
+    const result=await request('/api/complete',{task_id:1},cookie);
+    assert.equal(result.status,409);assert.match(result.body.error,/Missing tasks/);
+  }
+  assert.equal((await request('/api/takeover',{task_id:3,takeover_reason:'Covering yesterday'},staff)).status,409);
+  const tasks=(await db.query('SELECT status,completed_at FROM maintenance_tasks WHERE task_id IN (1,3)')).rows;
+  assert.ok(tasks.every(task=>task.status==='Pending'&&!task.completed_at));
+});
+
+test('crop variety migration preserves existing plants and cycles',async t=>{
+  const {db}=await fixture(t);
+  const plants=(await db.query('SELECT * FROM plants ORDER BY plant_id')).rows;
+  const cycles=(await db.query('SELECT * FROM crop_cycles ORDER BY cycle_id')).rows;
+  await db.query("DROP INDEX plants_name_variety_key; ALTER TABLE plants ADD CONSTRAINT plants_crop_name_key UNIQUE(crop_name); DELETE FROM schema_migrations WHERE name='004-crop-varieties'");
+  await seedDemo({...db},'2026-10-19');
+  assert.deepEqual((await db.query('SELECT * FROM plants ORDER BY plant_id')).rows,plants);
+  assert.deepEqual((await db.query('SELECT * FROM crop_cycles ORDER BY cycle_id')).rows,cycles);
+  await db.query("INSERT INTO plants(crop_name,variety) VALUES('Tomato','Beefsteak')");
+  await assert.rejects(db.query("INSERT INTO plants(crop_name,variety) VALUES('tomato',' CHERRY ')") ,error=>error.code==='23505');
 });
