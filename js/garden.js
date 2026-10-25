@@ -1,4 +1,3 @@
-// Map coordinates follow the supplied garden plan; record IDs remain independent of map numbers.
 export function mapPosition(slot) {
   if (slot >= 1 && slot <= 3) return [79, 85 - (slot - 1) * 11, 18, 9];
   if (slot >= 4 && slot <= 13) return [79, 58 - (slot - 4) * 5.7, 18, 4.3];
