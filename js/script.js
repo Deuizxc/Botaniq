@@ -139,7 +139,6 @@ function gardenMap(compact=false) {
             ${assigned?`<g class="plot-task-alert" aria-label="You have unfinished tasks here"><circle cx="${(x+w)*10-8}" cy="${y*7+5}" r="13"/><text x="${(x+w)*10-8}" y="${y*7+10}">!</text></g>`:''}
           </g>`;
         }).join('')}
-        <text class="map-site-label" x="30" y="582">A LITTLE CARE. A GREENER TOMORROW.</text>
       </g>
     </svg></div>
     <div class="map-bottom"><div class="map-key"><span class="indoor-key">Indoor / greenhouse</span><span class="outdoor-key">Outdoor beds</span><span class="nursery-key">Nursery</span><span class="vacant-key">Dashed = vacant</span><span class="task-key">! Your unfinished task</span></div><div class="map-controls"><button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button><button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
