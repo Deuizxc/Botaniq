@@ -17,9 +17,9 @@ function page(role='Staff') {
   return code=>runInContext(code,context);
 }
 
-test('missing tasks stay visible without completion or takeover actions in either role',()=>{
+test('overdue tasks stay visible without completion or takeover actions in either role',()=>{
   for(const role of ['Staff','Admin']) {
-    const render=page(role),html=render("taskFilter='Missing'; tasksPage()");
+    const render=page(role),html=render("taskFilter='Overdue'; tasksPage()");
     assert.match(html,/GH-01/);
     assert.doesNotMatch(html,/class="task-group"|data-action="complete"|data-action="takeover"|>Pending</);
     assert.doesNotMatch(render('dashboard()'),/data-action="complete"|>View notifications</);
@@ -30,7 +30,7 @@ test('missing tasks stay visible without completion or takeover actions in eithe
 
 test('admin can filter all assignments and read escaped weather observations',()=>{
   const render=page('Admin');
-  assert.match(render("taskFilter='Missing'; tasksPage()"),/GH-02/);
+  assert.match(render("taskFilter='Overdue'; tasksPage()"),/GH-02/);
   const filtered=render("staffFilter='2'; tasksPage()");
   assert.match(filtered,/GH-01/);assert.doesNotMatch(filtered,/GH-02/);
   const detail=render("state.adjustments=[{task_id:1,action:'Skip',full_name:'Garden Staff',reason:'Rain <today>',previous_schedule:'2026-10-22 08:00'}];taskDetails(state.tasks[0])");
@@ -45,4 +45,17 @@ test('crop search matches varieties and clearing it restores the full catalog fo
     assert.match(render("cropSearch=''; inventoryPage()").split('id="crop-results"')[1],/Beefsteak/);
     assert.match(render("cropSearch='unknown'; inventoryPage()"),/No crops match/);
   }
+});
+
+
+test('zone filters update existing plots without rebuilding or moving the selected map',()=>{
+  const render=page('Admin');
+  const result=render(`state.plots=[{plot_id:1,zone:'Greenhouse',plot_code:'GH-01'},{plot_id:2,zone:'Outdoor',plot_code:'OP-01'}];
+    const plots=state.plots.map(p=>({dataset:{id:String(p.plot_id)},classList:{toggle(name,value){this[name]=value}}}));
+    const buttons=['All zones','Greenhouse','Outdoor'].map(zone=>({dataset:{id:zone},classList:{toggle(name,value){this[name]=value}},setAttribute(name,value){this[name]=value}}));
+    document.querySelectorAll=selector=>selector==='.map-plot'?plots:buttons;
+    renderMain=()=>{throw new Error('Map must not be rebuilt')};zoomMap=()=>{throw new Error('Camera must not move')};
+    mapPan={x:47,y:-25};mapZoom=1.5;zone='Outdoor';filterMap();
+    JSON.stringify({dimmed:plots.map(p=>p.classList.dimmed),pressed:buttons.map(b=>b['aria-pressed']),pan:mapPan,zoom:mapZoom})`);
+  assert.deepEqual(JSON.parse(result),{dimmed:[true,false],pressed:['false','false','true'],pan:{x:47,y:-25},zoom:1.5});
 });

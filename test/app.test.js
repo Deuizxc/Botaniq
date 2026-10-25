@@ -210,12 +210,12 @@ test('plot entries are admin-only, validated, persistent snapshots visible to st
   assert.ok(state.cycles.some(c=>c.harvest_date&&c.harvest_date<state.cutoff));
 });
 
-test('missing tasks cannot be completed or taken over by either role',async t=>{
+test('overdue tasks cannot be completed or taken over by either role',async t=>{
   const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
   await db.query("UPDATE maintenance_tasks SET scheduled_date='2026-10-18' WHERE task_id IN (1,3)");
   for(const cookie of [admin,staff]) {
     const result=await request('/api/complete',{task_id:1},cookie);
-    assert.equal(result.status,409);assert.match(result.body.error,/Missing tasks/);
+    assert.equal(result.status,409);assert.match(result.body.error,/Overdue tasks/);
   }
   assert.equal((await request('/api/takeover',{task_id:3,takeover_reason:'Covering yesterday'},staff)).status,409);
   const tasks=(await db.query('SELECT status,completed_at FROM maintenance_tasks WHERE task_id IN (1,3)')).rows;

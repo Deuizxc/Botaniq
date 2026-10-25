@@ -440,7 +440,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         if (!task) fail('Task not found.', 404);
         if (task.status !== 'Pending') fail('This task is already closed.', 409);
         if (['/api/complete', '/api/takeover'].includes(path) && task.scheduled_date < today()) {
-          fail('Missing tasks cannot be completed.', 409);
+          fail('Overdue tasks cannot be completed.', 409);
         }
         if (path === '/api/task-assignment') {
           admin(user);

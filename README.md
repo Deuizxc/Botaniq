@@ -52,7 +52,7 @@ Every permission is enforced on the server, not only hidden in the interface.
 
 **Task management**
 
-- **Dated maintenance tasks**: Manual watering, fertilizer application, hydroponic nutrients, and general maintenance. Task lists have Assigned, Missing, and Done views. Tasks cannot be completed early, and missing tasks cannot be completed or taken over.
+- **Dated maintenance tasks**: Manual watering, fertilizer application, hydroponic nutrients, and general maintenance. Task lists have Assigned, Overdue, and Done views. Tasks cannot be completed early, and overdue tasks cannot be completed or taken over.
 - **Task takeover and review**: Staff can take over a colleague's task with a required reason. The original assignee is preserved, and the admin dashboard raises a review flag.
 - **Weather adjustments**: Watering tasks can be skipped or rescheduled with an explanation. Every change is written to an audit log, and extra heat-related watering can be added as a new task.
 - **Fertilizer records**: Completing a fertilizer or hydroponic task requires a product name and records the application time, plot, and recorder in the same transaction.
