@@ -59,3 +59,16 @@ test('zone filters update existing plots without rebuilding or moving the select
     JSON.stringify({dimmed:plots.map(p=>p.classList.dimmed),pressed:buttons.map(b=>b['aria-pressed']),pan:mapPan,zoom:mapZoom})`);
   assert.deepEqual(JSON.parse(result),{dimmed:[true,false],pressed:['false','false','true'],pan:{x:47,y:-25},zoom:1.5});
 });
+
+
+test('map editing and removal controls are separate from plot details and staff views',()=>{
+  const render=page('Admin');
+  render("state.plots=[{plot_id:1,plot_code:'GH-01',zone:'Greenhouse',map_slot:1,occupancy_status:'Vacant',map_x:10,map_y:20,map_w:15,map_h:10},{plot_id:2,plot_code:'REMOVED',zone:'Outdoor',removed_at:'2026-10-26',map_slot:2}]");
+  const normal=render('plotsPage()');
+  assert.match(normal,/Edit map/);assert.doesNotMatch(normal,/plot-handle|map-edit-toolbar|REMOVED|data-action="new-plot"/);
+  const edit=render('editingMap=true;mapEditId=1;plotsPage()');
+  assert.match(edit,/Done editing map/);assert.match(edit,/map-edit-toolbar/);assert.match(edit,/data-action="new-plot"/);
+  assert.equal((edit.match(/class="plot-handle/g)||[]).length,4);
+  assert.match(edit,/x="100" y="140" width="150" height="70"/);
+  assert.doesNotMatch(page('Staff')('plotsPage()'),/data-action="map-edit"|data-action="new-plot"|data-action="remove-plot"/);
+});

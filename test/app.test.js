@@ -233,3 +233,37 @@ test('crop variety migration preserves existing plants and cycles',async t=>{
   await db.query("INSERT INTO plants(crop_name,variety) VALUES('Tomato','Beefsteak')");
   await assert.rejects(db.query("INSERT INTO plants(crop_name,variety) VALUES('tomato',' CHERRY ')") ,error=>error.code==='23505');
 });
+
+
+test('admin map layout persists, rejects stale edits, and removes plots without erasing history',async t=>{
+  const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
+  const edit={plot_id:1,revision:0,bounds:[10,20,15,10],map_edit:true};
+  assert.equal((await request('/api/plot-layout',edit,staff)).status,403);
+  assert.equal((await request('/api/remove-plot',edit,staff)).status,403);
+  assert.equal((await request('/api/plot-layout',{...edit,map_edit:false},admin)).status,409);
+  for(const bounds of [[-1,2,3,4],[99,2,3,4],[2,999,3,4],[2,3,1,4],[2,3,4],[2,3,4,'5'],[null,3,4,5]]) {
+    assert.equal((await request('/api/plot-layout',{...edit,bounds},admin)).status,400);
+  }
+  assert.equal((await request('/api/plot-layout',edit,admin)).status,200);
+  assert.equal((await request('/api/plot-layout',edit,admin)).status,409);
+  const saved=(await request('/api/state',undefined,staff)).body.plots.find(p=>p.plot_id===1);
+  assert.deepEqual([saved.map_x,saved.map_y,saved.map_w,saved.map_h],[10,20,15,10]);assert.equal(saved.map_revision,1);
+  assert.equal((await request('/api/remove-plot',{...edit,revision:1},admin)).status,409);
+  assert.equal((await request('/api/plots',{plot_code:'CUSTOM',zone:'Outdoor',bounds:[40,50,15,10]},admin)).status,200);
+  const p=await db.get("SELECT * FROM plots WHERE plot_code='CUSTOM'");
+  assert.equal(p.map_x,40);
+  const removal={plot_id:p.plot_id,revision:0,map_edit:true};
+  assert.equal((await request('/api/remove-plot',{...removal,map_edit:false},admin)).status,409);
+  const task={plot_id:p.plot_id,task_type:'Manual watering',scheduled_date:'2026-10-19',scheduled_time:'08:00',assigned_staff_id:2};
+  assert.equal((await request('/api/tasks',task,admin)).status,200);
+  assert.equal((await request('/api/remove-plot',removal,admin)).status,409);
+  await db.query("UPDATE maintenance_tasks SET status='Completed' WHERE plot_id=$1",[p.plot_id]);
+  assert.equal((await request('/api/plot-entry',{plot_id:p.plot_id,cycle_id:null,description:'Keep this history',watered_at:null,harvested_at:null,fertilizer:null,fertilized_at:null},admin)).status,200);
+  assert.equal((await request('/api/remove-plot',removal,admin)).status,200);
+  assert.ok((await db.get(`SELECT removed_at FROM plots WHERE plot_id=${p.plot_id}`)).removed_at);
+  assert.equal((await db.get(`SELECT COUNT(*)::int AS n FROM plot_entries WHERE plot_id=${p.plot_id}`)).n,1);
+  assert.equal((await db.get(`SELECT COUNT(*)::int AS n FROM maintenance_tasks WHERE plot_id=${p.plot_id}`)).n,1);
+  assert.equal((await request('/api/tasks',task,admin)).status,404);
+  assert.equal((await request('/api/plot-layout',{...removal,revision:1,bounds:[1,2,3,4]},admin)).status,404);
+  assert.equal((await request('/api/cycles',{plot_id:p.plot_id,plant_id:1,planted_date:'2026-10-19',assigned_staff_id:2},admin)).status,404);
+});

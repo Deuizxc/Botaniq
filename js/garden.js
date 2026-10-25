@@ -8,6 +8,22 @@ export function mapPosition(slot) {
   })[slot] || [3 + ((slot - 28) % 4) * 17, 82 + Math.floor((slot - 28) / 4) * 13, 15, 10];
 }
 
+export const plotBounds = plot => plot.map_x == null
+  ? mapPosition(plot.map_slot || plot.plot_id)
+  : [plot.map_x, plot.map_y, plot.map_w, plot.map_h];
+
+export function dragPlot(bounds, dx, dy, corner = '', height = 100) {
+  let [x,y,w,h]=bounds;
+  const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+  if (!corner) return [clamp(x+dx,0,100-w),clamp(y+dy,0,height-h),w,h];
+  const right=x+w,bottom=y+h;
+  if (corner.includes('w')) {x=clamp(x+dx,0,right-3);w=right-x;}
+  if (corner.includes('e')) w=clamp(w+dx,3,100-x);
+  if (corner.includes('n')) {y=clamp(y+dy,0,bottom-3);h=bottom-y;}
+  if (corner.includes('s')) h=clamp(h+dy,3,height-y);
+  return [x,y,w,h];
+}
+
 const dateOf = value => value?.slice(0, 10) || '';
 const latest = (rows, key) => [...rows].sort((a, b) => (b[key] || '').localeCompare(a[key] || ''))[0];
 const localDate = value => value?.includes('T')

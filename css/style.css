@@ -1798,3 +1798,13 @@ dialog::backdrop {
 .inspector-buttons .plot-exit:hover {background:#163421}
 .inspector-heading {flex-wrap:wrap}
 .inspector-buttons {margin-left:auto;align-items:center}
+
+.map-edit-toolbar {padding:16px 20px;border-bottom:2px solid #627e45;background:#edf3df;display:flex;align-items:center;flex-wrap:wrap;gap:12px;font-size:14px}
+.map-edit-toolbar>span {flex:1;min-width:180px}.map-edit-toolbar p {flex-basis:100%;margin:0;font-size:13px}
+#map-edit-selection {display:flex;align-items:center;flex-wrap:wrap;gap:12px;width:100%}#map-edit-selection:empty {display:none}
+#map-edit-selection>span {flex:1;min-width:150px;font-size:12px}
+.editing-map .map-world {transition:none}.editing-map .map-plot {cursor:move}
+.plot-handle {fill:#fff;stroke:#254a34;stroke-width:2;vector-effect:non-scaling-stroke}
+.plot-handle.nw,.plot-handle.se {cursor:nwse-resize}.plot-handle.ne,.plot-handle.sw {cursor:nesw-resize}
+.plot-handle:focus-visible {fill:#f0d875;stroke:#111;stroke-width:4;outline:none}
+.placing-plot .map-svg {cursor:crosshair}.placing-plot .map-plot {cursor:not-allowed}
