@@ -517,7 +517,7 @@ document.addEventListener('click',async event=>{
     if(action==='task-filter'){taskFilter=id;renderMain();return;}
     if(action==='stat-plots'){
       const stat=overviewPlots(state)[Number(id)];if(!stat)return;
-      $('#modal').innerHTML=`<div class="modal-head"><h2>${escape(stat.label)}</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="stat-plots">${stat.plots.map(p=>`<a href="plot-info.html?id=${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(p.zone)} →</span></a>`).join('')||empty('No plots in this category.')}</div>`;
+      $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">${escape(stat.label)}</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="stat-plots">${stat.plots.map(p=>`<a href="plot-info.html?id=${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(p.zone)} →</span></a>`).join('')||empty('No plots in this category.')}</div>`;
       $('#modal').showModal();return;
     }
     if(action==='calendar-month'){calendarOffset+=Number(id);calendarDate='';renderMain();return;}
