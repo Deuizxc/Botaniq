@@ -43,17 +43,21 @@ Every permission is enforced on the server, not only hidden in the interface.
 
 **Garden management**
 
+- **Four space types**: Greenhouse, Outdoor, Nursery, and Open space. Open spaces cannot hold crops. Circular map landmarks have been removed.
+- **Greenhouse beds**: Open a greenhouse to view its individual beds and crops. Admins use **Edit map → Add bed** to place rectangular beds, then drag or resize them independently. Existing greenhouse plots become their first bed without changing plot IDs, crop cycles, photos, assignments or history. The greenhouse container retains the original map position and code.
 - **Interactive garden map**: 27 numbered plots with zoom, drag/arrow-key panning, an entrance marker, indoor/outdoor styling, and live occupancy. Plots with your unfinished tasks are flagged. A plot picker supports small screens and keyboard navigation.
 - **Admin map editing**: Enter **Edit map** to place new plots, drag plots, resize their corners, or remove a selected plot. Arrow keys move the focused plot or resize a focused corner. Each move saves on release. Removal keeps historical records and refuses plots with live crops or pending tasks. Plot details have their own separate editor.
 - **Plot overview and editing**: Each plot shows a photo, description, last watering, last harvest, and current fertilizer. Admins can choose a JPG, PNG, or WebP in Edit plot details, preview it, and save it or restore the default. Uploads are resized to at most 960 pixels and 256 KB; stored photos require sign-in to view and are fetched separately from workspace state. Admins edit plots; staff can view every plot.
 - **Crop cycles**: Start, assign, harvest, and transplant crops. A cycle retains its original plot, planting date, and staff assignment for its whole life.
 - **Atomic nursery transplants**: Moving a seedling from the nursery to a plot is a single database transaction, and a partial unique index guarantees one live cycle per plot even under concurrent requests.
-- **Crop catalog**: Crops are unique by case-insensitive name and variety, with searchable dropdowns.
+- **Crop catalog**: Crops are unique by case-insensitive name and variety, with a live text search across crop names, varieties and growing notes.
 - **Per-plot history**: Dated crop records, fertilizer applications, and immutable snapshots of every admin save. Search supports free text and tokens such as `crop:"String beans"`, `fertilizer:none`, `before:2026-10-01`, `after:2026-09-01`, and `on:2026-09-20`.
 
 **Task management**
 
-- **Dated maintenance tasks**: Manual watering, fertilizer application, hydroponic nutrients, and general maintenance. Task lists have Assigned, Overdue, and Done views. Tasks cannot be completed early, and overdue tasks cannot be completed or taken over.
+- **Three-day expiry**: Pending tasks are deleted when they reach three calendar days overdue in Asia/Manila, along with their task messages and weather adjustments. Cleanup happens on the next authenticated API request (including the open app's 30-second poll); no background scheduler runs while the app is idle. Completed/skipped tasks, crop history and nutrient records remain.
+- **Harvest tasks**: Scheduling requires a live crop. Staff completion or takeover closes that specific crop cycle and frees its bed in one transaction. A moved, harvested or replaced crop cannot be harvested again by an old task.
+- **Dated maintenance tasks**: Manual watering, fertilizer application, hydroponic nutrients, harvest, and general maintenance. The default Open view includes overdue work in a flat dated list; Overdue and Done are optional filters. Tasks cannot be completed early, and overdue tasks cannot be completed or taken over.
 - **Task takeover and review**: Staff can take over a colleague's task with a required reason. The original assignee is preserved, and the admin dashboard raises a review flag.
 - **Weather adjustments**: Watering tasks can be skipped or rescheduled with an explanation. Every change is written to an audit log, and extra heat-related watering can be added as a new task.
 - **Fertilizer records**: Completing a fertilizer or hydroponic task requires a product name and records the application time, plot, and recorder in the same transaction.
@@ -61,7 +65,7 @@ Every permission is enforced on the server, not only hidden in the interface.
 
 **Accounts and experience**
 
-- **Role-aware dashboards**: Staff see their unfinished tasks and a monthly calendar of their assignments. Admins see team assignments (excluding their own) with pending totals per staff member.
+- **Role-aware dashboards**: Staff see their unfinished tasks and a monthly calendar of their assignments. Both roles can open Awaiting water, Awaiting fertilizer, Awaiting harvest and Available plots cards to inspect their plots. Admins see daily staff progress: today's assigned tasks completed by that staff member on the same Manila date; tasks covered by someone else do not count toward their completion.
 - **Profiles and accounts**: Users edit their own name, email, and password. Admins create and remove accounts. Removing an account ends access, unassigns pending work and live crops, and retains the person's name on historical records.
 - **Notifications**: Toasts confirm actions and announce newly detected assignments or messages. Open sessions poll for updates every 30 seconds.
 - **Accessibility and responsiveness**: Verified at 1440, 768, and 390 px widths; transitions respect reduced-motion preferences.
@@ -145,7 +149,7 @@ On first run against an empty database, the app seeds demonstration garden data 
 
 | Name | Email | Role |
 | --- | --- | --- |
-| CUIA Admin | `admin@gmail.com` | Admin |
+| CUAI Admin | `admin@gmail.com` | Admin |
 
 > **Warning:** The shared initial password is insecure. Change it under **Account → Edit profile** immediately, and replace or remove the demo accounts and data before any real use.
 
@@ -241,7 +245,7 @@ Botaniq/
 ├── js/
 │   ├── script.js       # Client app: routing, map, forms, search
 │   └── garden.js       # Map geometry, plot facts, history filters
-├── migrations/         # Versioned database upgrades (001-006)
+├── migrations/         # Versioned database upgrades (001-007)
 ├── test/               # accounts, app, garden, and views tests
 ├── backend.js          # HTTP server, auth, API, business rules
 ├── index.html          # Single-page application shell
