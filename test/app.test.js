@@ -200,6 +200,7 @@ test('greenhouses contain independently planted, editable beds and open spaces c
   const house=await db.get("SELECT * FROM plots WHERE plot_code='HOUSE'");
   const newBed={plot_code:'BED-A',zone:'Greenhouse',parent_plot_id:house.plot_id,bounds:[8,8,30,20]};
   assert.equal((await request('/api/plots',newBed,staff)).status,403);
+  assert.equal((await request('/api/plots',{...newBed,parent_plot_id:0},admin)).status,400);
   assert.equal((await request('/api/plots',{...newBed,parent_plot_id:3},admin)).status,400);
   assert.equal((await request('/api/plots',{...newBed,bounds:[8,90,30,20]},admin)).status,400);
   assert.equal((await request('/api/plots',newBed,admin)).status,200);
@@ -263,6 +264,16 @@ test('three-day expiry deletes only pending work and its messages while retainin
   assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM task_adjustments WHERE task_id=1')).n,0);
   assert.deepEqual(await db.get('SELECT COUNT(*)::int AS n FROM crop_cycles'),before);
   assert.equal((await request('/api/complete',{task_id:1},admin)).status,404);
+});
+
+test('manual harvest and a staff harvest task cannot both close the same crop',async t=>{
+  const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
+  await request('/api/tasks',{plot_id:1,task_type:'Harvest',scheduled_date:'2026-10-19',scheduled_time:'08:00',assigned_staff_id:2},admin);
+  const task=await db.get("SELECT task_id FROM maintenance_tasks WHERE task_type='Harvest'");
+  const results=await Promise.all([request('/api/harvest',{cycle_id:1,harvest_date:'2026-10-19'},admin),request('/api/complete',{task_id:task.task_id},staff)]);
+  assert.equal(results.filter(r=>r.status===200).length,1);
+  assert.ok(results.every(r=>[200,400,409].includes(r.status)));
+  assert.equal((await db.get('SELECT occupancy_status FROM plots WHERE plot_id=1')).occupancy_status,'Harvested');
 });
 
 test('plot entries are admin-only, validated, persistent snapshots visible to staff',async t=>{
