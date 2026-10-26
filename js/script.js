@@ -1,4 +1,4 @@
-import { plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskPeriod, calendarMonth, notificationKeys } from './garden.js';
+import { plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, isGreenhouse, isGrowingPlot, calendarMonth, notificationKeys } from './garden.js';
 const $ = selector => document.querySelector(selector);
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const paths = {
@@ -23,13 +23,15 @@ const paths = {
   sun:'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1 1 M18 18l1 1 M5 19l1-1 M18 6l1-1'
 };
 const icon = name => `<svg aria-hidden="true" viewBox="0 0 24 24"><path d="${paths[name] || paths.leaf}"/></svg>`;
-let state, view, search = '', zone = 'All zones', taskFilter = 'Assigned', toastTimer;
+let state, view, search = '', zone = 'All zones', taskFilter = 'Open', toastTimer;
 let taskScope = 'mine', staffFilter = 'all', cropSearch = '', calendarOffset = 0, calendarDate = '', mapZoom = 1;
 let mapPan = {x:0,y:0};
 let editingMap=false, mapPlacing=false, mapEditId=null, mapSaving=false, mapExtent=100;
 const activePlots=()=>state.plots.filter(p=>!p.removed_at);
 let plotTab = 'overview', editingPlot = false, historyQuery = '', historyFertilizer = 'all', historyFrom = '', historyTo = '';
 const selectedPlot = () => state?.plots.find(p => p.plot_id === Number(new URLSearchParams(location.search).get('id')));
+const greenhouse = () => state?.plots.find(p => isGreenhouse(p) && p.plot_id === (selectedPlot()?.parent_plot_id || Number(new URLSearchParams(location.search).get('greenhouse'))));
+const mapPlots = () => activePlots().filter(p => (p.parent_plot_id || null) === (greenhouse()?.plot_id || null));
 const isAdmin = () => state.user.role === 'Admin';
 const initials = name => name.split(' ').slice(0,2).map(x => x[0]).join('');
 const fmt = value => value ? new Date(`${value.slice(0,10)}T00:00:00Z`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'}) : '—';
@@ -78,7 +80,7 @@ function link(label,name) { return `<a href="${href(name)}">${label} ${icon('arr
 function renderMain() {
   let content;
   if(view==='dashboard') content=dashboard();
-  if(view==='plots') content=plotsPage();
+  if(view==='plots') {const p=selectedPlot();if(p&&isGreenhouse(p))history.replaceState({},'',`plot-info.html?greenhouse=${p.plot_id}`);content=plotsPage();}
   if(view==='tasks') content=tasksPage();
   if(view==='inventory') content=inventoryPage();
   if(view==='staff') content=isAdmin()?staffPage():empty('Staff management is available to administrators.');
@@ -99,11 +101,9 @@ function dashboard() {
   const pending=assignedPending(state.tasks,state.user.user_id);
   const team=state.tasks.filter(t=>t.status==='Pending');
   const tasks=(isAdmin()?team:pending).filter(t=>!calendarDate||t.scheduled_date===calendarDate);
-  const watered=new Set(state.tasks.filter(t=>t.task_type==='Manual watering'&&t.status==='Completed'&&t.completed_at&&new Date(t.completed_at).toLocaleDateString('en-CA',{timeZone:'Asia/Manila'})===state.today).map(t=>t.plot_id));
-  const watering=new Set(state.tasks.filter(t=>t.task_type==='Manual watering'&&t.status==='Pending'&&t.scheduled_date<=state.today).map(t=>t.plot_id));
-  const stats=[['Watered plots',watered.size,'Completed today'],['Awaiting water',watering.size,'Due or overdue'],['Harvested crops',state.cycles.filter(c=>c.harvest_date===state.today).length,'Harvested today'],['Available plots',activePlots().filter(p=>p.occupancy_status!=='Occupied').length,'Ready for planting']];
+  const stats=overviewPlots(state);
   return heading(`Welcome, ${escape(isAdmin()?'Admin':state.user.full_name.split(' ')[0])}.`,`${fmt(state.today)} · ${isAdmin()?team.length+' team tasks':pending.length+' of your tasks'} still need care.`,isAdmin()?button('Schedule task','new-task','','','plus'):button('View my tasks','my-tasks','','','tasks'))+
-    `<div class="stats care-stats">${stats.map(([label,value,detail])=>`<article class="stat"><div class="stat-top">${label}</div><div class="stat-value">${value}</div><p class="stat-foot">${detail}</p></article>`).join('')}</div><div class="care-grid ${isAdmin()?'admin-care':''}"><section class="panel care-queue">${panelHead(isAdmin()?'Team assignments':'Your tasks',calendarDate?fmt(calendarDate):'Unfinished care, ordered by schedule.',link('View all','tasks'))}${calendarDate?button('Show all dates','calendar-clear','','text small'):''}<div class="task-list">${tasks.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||''])).slice(0,4).map(t=>`<div class="care-row"><div><a href="plot-info.html?id=${t.plot_id}">${escape(t.plot_code)}</a><h3>${escape(t.task_type)}</h3><p>${isAdmin()?escape(t.assigned_staff||'Unassigned')+' · ':''}${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}</p></div><div>${t.scheduled_date<state.today?badge('Overdue','amber'):''}${t.scheduled_date===state.today&&!isAdmin()?button('Complete','complete',t.task_id,'secondary small','check'):t.scheduled_date>state.today?badge('Upcoming','gray'):''}</div></div>`).join('')||empty(calendarDate?'No unfinished tasks on this date.':'All caught up. No unfinished tasks.')}</div>${tasks.length>4?`<p class="queue-more">${tasks.length-4} more tasks in Maintenance tasks.</p>`:''}</section>${isAdmin()?`<aside class="panel team-summary">${panelHead('Garden team','Unfinished assignments by staff')}${state.users.filter(u=>u.role==='Staff'&&u.active).map(u=>`<div class="team-row"><span class="avatar">${escape(initials(u.full_name))}</span><span>${escape(u.full_name)}</span><strong>${assignedPending(state.tasks,u.user_id).length}</strong></div>`).join('')||empty('No staff accounts yet.')}</aside>`:taskCalendar(pending)}</div>`;
+    `<div class="stats care-stats">${stats.map(({label,plots},i)=>`<button class="stat" data-action="stat-plots" data-id="${i}" aria-label="${label}: ${plots.length}. View plots"><span class="stat-top">${label}</span><span class="stat-value">${plots.length}</span><span class="stat-foot">View plots →</span></button>`).join('')}</div><div class="care-grid ${isAdmin()?'admin-care':''}"><section class="panel care-queue">${panelHead(isAdmin()?'Team assignments':'Your tasks',calendarDate?fmt(calendarDate):'Unfinished care, ordered by schedule.',link('View all','tasks'))}${calendarDate?button('Show all dates','calendar-clear','','text small'):''}<div class="task-list">${tasks.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||''])).slice(0,4).map(t=>`<div class="care-row"><div><a href="plot-info.html?id=${t.plot_id}">${escape(t.plot_code)}</a><h3>${escape(t.task_type)}</h3><p>${isAdmin()?escape(t.assigned_staff||'Unassigned')+' · ':''}${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}</p></div><div>${t.scheduled_date<state.today?badge('Overdue','amber'):''}${t.scheduled_date===state.today&&!isAdmin()?button('Complete','complete',t.task_id,'secondary small','check'):t.scheduled_date>state.today?badge('Upcoming','gray'):''}</div></div>`).join('')||empty(calendarDate?'No unfinished tasks on this date.':'All caught up. No unfinished tasks.')}</div>${tasks.length>4?`<p class="queue-more">${tasks.length-4} more tasks in Maintenance tasks.</p>`:''}</section>${isAdmin()?`<aside class="panel team-summary">${panelHead('Garden team','Today’s assignments completed today')}${state.users.filter(u=>u.role==='Staff'&&u.active) .map(u=>{const {total,completed}=dailyProgress(state.tasks,u.user_id,state.today);return `<div class="team-row"><span class="avatar">${escape(initials(u.full_name))}</span><span>${escape(u.full_name)}</span><div class="team-progress"><progress value="${completed}" max="${total||1}" aria-label="${escape(u.full_name)}: ${completed} of ${total} assignments completed today"></progress><small>${total?`${completed} / ${total} completed`:'No tasks today'}</small></div></div>`;}).join('')||empty('No staff accounts yet.')}</aside>`:taskCalendar(pending)}</div>`;
 }
 function taskCalendar(pending) {
   const month=calendarMonth(state.today,calendarOffset,pending);
@@ -121,47 +121,54 @@ function filterMap() {
   });
 }
 function plotsPage() {
-  return heading('CUAI Garden Atlas','Every plot gets the care it needs.',isAdmin()?button(editingMap?'Done editing map':'Edit map','map-edit','','',editingMap?'check':'pencil'):'')+
-    `<div class="toolbar">${filters(['All zones','Greenhouse','Outdoor','Nursery'],zone,'zone')}<span class="muted"><small>Tap a space. See what’s growing.</small></span></div><div class="atlas-layout ${isAdmin()?'with-tasks':''}">${isAdmin()?`<aside class="panel atlas-tasks">${panelHead('Unfinished tasks','Staff assignments')}${state.tasks.filter(t=>t.status==='Pending'&&match([t.task_type,t.plot_code,t.assigned_staff||''])).map(t=>`<a class="atlas-task" href="tasks.html?task=${t.task_id}" data-task-date="${t.scheduled_date}"><strong>${escape(t.task_type)}</strong><span>${escape(t.plot_code)} · ${escape(t.assigned_staff||'Unassigned')}</span><small>${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}${t.scheduled_date<state.today?' · Overdue':''}</small></a>`).join('')||empty('No unfinished tasks.')}</aside>`:''}${gardenMap()}</div>`;
+  const house=greenhouse();
+  return heading(house?escape(house.plot_code):'CUAI Garden Atlas',house?'Each bed has its own crop, care tasks and editable layout.':'Every plot gets the care it needs.',(house?'<a class="btn secondary" href="plot-info.html">Back to garden</a>':'')+(isAdmin()?button(editingMap?'Done editing map':'Edit map','map-edit','','',editingMap?'check':'pencil'):''))+
+    `<div class="toolbar">${filters(['All zones','Greenhouse','Outdoor','Nursery','Open space'],zone,'zone')}<span class="muted"><small>Tap a space. See what’s growing.</small></span></div><div class="atlas-layout ${isAdmin()?'with-tasks':''}">${isAdmin()?`<aside class="panel atlas-tasks">${panelHead('Unfinished tasks','Staff assignments')}${state.tasks.filter(t=>t.status==='Pending'&&match([t.task_type,t.plot_code,t.assigned_staff||''])).map(t=>`<a class="atlas-task" href="tasks.html?task=${t.task_id}" data-task-date="${t.scheduled_date}"><strong>${escape(t.task_type)}</strong><span>${escape(t.plot_code)} · ${escape(t.assigned_staff||'Unassigned')}</span><small>${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}${t.scheduled_date<state.today?' · Overdue':''}</small></a>`).join('')||empty('No unfinished tasks.')}</aside>`:''}${gardenMap()}</div>`;
 }
 function gardenMap(compact=false) {
-  const height=(editingMap?mapExtent:Math.max(100,...activePlots().map(p=>{const [,y,,h]=plotBounds(p);return y+h+5;})))*7;
+  const house=greenhouse(),plots=mapPlots();
+  const height=(house?100:editingMap?mapExtent:Math.max(100,...plots.map(p=>{const [,y,,h]=plotBounds(p);return y+h+5;})))*7;
   return `<section class="garden-map ${compact?'compact':''} ${editingMap?'editing-map':''} ${mapPlacing?'placing-plot':''}" aria-label="Interactive garden map">
     ${editingMap?mapEditorToolbar():''}
-    <div class="map-caption"><span class="eyebrow">CUAI / Garden atlas</span><label class="map-picker"><span class="sr-only">Choose a plot</span><select id="map-picker"><option value="">Choose a plot…</option>${[...activePlots()].sort((a,b)=>a.map_slot-b.map_slot).map(p=>`<option value="${p.plot_id}" ${selectedPlot()?.plot_id===p.plot_id?'selected':''}>${p.map_slot} · ${escape(p.plot_code)}</option>`).join('')}</select></label><span>${icon('sprout')} Tap a space. See what’s growing.</span></div>
+    <div class="map-caption"><span class="eyebrow">CUAI / Garden atlas</span><label class="map-picker"><span class="sr-only">Choose a plot</span><select id="map-picker"><option value="">Choose a plot…</option>${[...plots].sort((a,b)=>a.map_slot-b.map_slot).map(p=>`<option value="${p.plot_id}" ${selectedPlot()?.plot_id===p.plot_id?'selected':''}>${p.map_slot?`${p.map_slot} · `:''}${escape(p.plot_code)}</option>`).join('')}</select></label><span>${icon('sprout')} Tap a space. See what’s growing.</span></div>
     <div class="map-viewport"><svg class="map-svg" viewBox="0 0 1000 ${height}" aria-label="Garden plots. Drag or use arrow keys to move the map." role="group" tabindex="0">
-      <defs><pattern id="map-grain" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#a8b99b" opacity=".3"/></pattern>
+      <defs><pattern id="map-grain" width="24" height="24" patternUnits="userSpaceOnUse"><rect x="2" y="2" width="2" height="2" fill="#a8b99b" opacity=".3"/></pattern>
       <pattern id="bed-rows" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 6h12" stroke="#fff" opacity=".15" stroke-width="2"/></pattern></defs>
       <g class="map-world">
         <rect class="map-ground" x="0" y="0" width="1000" height="${height}" rx="28"/>
         <rect x="0" y="0" width="1000" height="${height}" fill="url(#map-grain)" rx="28"/>
-        <path class="map-path-edge" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
+        ${house?'':`<path class="map-path-edge" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
         <path class="map-path" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
-        <g class="map-landmarks"><circle cx="515" cy="215" r="48"/><circle cx="515" cy="215" r="33"/><rect x="222" y="170" width="77" height="98" rx="20"/><text x="260" y="225">GROW</text><text x="515" y="220">REST</text></g>
-        <g class="map-entrance"><text x="638" y="674">Entrance</text><path d="M713 669h17m-8-7 8 7-8 7"/></g>
-        ${activePlots().map(mapPlotMarkup).join('')}
+        
+        <g class="map-entrance"><text x="638" y="674">Entrance</text><path d="M713 669h17m-8-7 8 7-8 7"/></g>`}
+        ${plots.map(mapPlotMarkup).join('')}
       </g>
     </svg></div>
-    <div class="map-bottom"><div class="map-key"><span class="indoor-key">Indoor / greenhouse</span><span class="outdoor-key">Outdoor beds</span><span class="nursery-key">Nursery</span><span class="vacant-key">Dashed = vacant</span><span class="task-key">! Your unfinished task</span></div><div class="map-controls"><button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button><button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
+    <div class="map-bottom"><div class="map-key"><span class="indoor-key">Greenhouse — open to view beds</span><span class="outdoor-key">Outdoor beds</span><span class="nursery-key">Nursery</span><span class="space-key">Open space</span><span class="vacant-key">Dashed = vacant</span><span class="task-key">! Your unfinished task</span></div><div class="map-controls"><button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button><button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
+    ${house?`<div class="greenhouse-beds">${plots.map(p=>{const crop=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);return `<button class="greenhouse-bed" data-action="map-plot" data-id="${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(crop?`${crop.crop_name}${crop.variety?' · '+crop.variety:''}`:'Available for planting')}</span></button>`;}).join('')||empty(isAdmin()?'No beds yet. Choose Edit map, then Add bed to lay out this greenhouse.':'No beds have been added yet.')}</div>`:''}
     ${compact?'':'<aside id="plot-inspector" class="plot-inspector" aria-label="Selected plot" hidden></aside>'}
   </section>`;
 }
 function mapPlotMarkup(p) {
           const slot=p.map_slot||p.plot_id,[x,y,w,h]=plotBounds(p),c=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);
+          const beds=activePlots().filter(b=>b.parent_plot_id===p.plot_id);
+          const caption=isGreenhouse(p)?`${beds.length} bed${beds.length===1?'':'s'}`:p.zone==='Open space'?'No planting':c?.crop_name||'Available for planting';
+          const occupancy=isGreenhouse(p)?(beds.some(b=>b.occupancy_status==='Occupied')?'Occupied':'Vacant'):p.occupancy_status;
           const muted=(zone!=='All zones'&&zone!==p.zone)||!match([p.plot_code,p.zone,c?.crop_name||'']);
-          const assigned=assignedPending(state.tasks,state.user.user_id).some(t=>t.plot_id===p.plot_id);
-          return `<g class="map-plot ${p.zone.toLowerCase()} ${p.occupancy_status.toLowerCase()} ${muted?'dimmed':''}" data-action="map-plot" data-id="${p.plot_id}" role="button" tabindex="0" aria-pressed="${editingMap&&mapEditId===p.plot_id}" aria-label="Plot ${slot}, ${escape(p.plot_code)}, ${escape(c?.crop_name||p.occupancy_status)}">
-            <title>${escape(p.plot_code)} · ${escape(c?.crop_name||'Available for planting')} · ${p.zone}</title>
-            <rect class="plot-shape" x="${x*10}" y="${y*7}" width="${w*10}" height="${h*7}" rx="${p.zone==='Outdoor'?5:18}"/>
+          const assigned=assignedPending(state.tasks,state.user.user_id).some(t=>t.plot_id===p.plot_id||beds.some(b=>b.plot_id===t.plot_id));
+          return `<g class="map-plot ${p.zone.toLowerCase().replace(' ','-')} ${occupancy.toLowerCase()} ${muted?'dimmed':''}" data-action="map-plot" data-id="${p.plot_id}" role="button" tabindex="0" aria-pressed="${editingMap&&mapEditId===p.plot_id}" aria-label="Plot ${slot}, ${escape(p.plot_code)}, ${escape(caption)}">
+            <title>${escape(p.plot_code)} · ${escape(caption)} · ${p.zone}</title>
+            <rect class="plot-shape" x="${x*10}" y="${y*7}" width="${w*10}" height="${h*7}" rx="3"/>
             <rect class="plot-texture" x="${x*10+4}" y="${y*7+4}" width="${w*10-8}" height="${h*7-8}" rx="5" fill="url(#bed-rows)"/>
-            <text class="map-plot-label" x="${(x+w/2)*10}" y="${(y+h/2)*7+5}">${slot}<tspan class="map-plot-code"> · ${escape(p.plot_code)}</tspan></text>
-            <circle class="plot-status" cx="${(x+w)*10-10}" cy="${y*7+10}" r="4"/>
-            ${assigned?`<g class="plot-task-alert" aria-label="You have unfinished tasks here"><circle cx="${(x+w)*10-8}" cy="${y*7+5}" r="13"/><text x="${(x+w)*10-8}" y="${y*7+10}">!</text></g>`:''}
+            <text class="map-plot-label" x="${(x+w/2)*10}" y="${(y+h/2)*7+5}">${slot}${w>=17?`<tspan class="map-plot-code"> · ${escape(p.plot_code)}</tspan>`:''}</text>
+            ${h>=14?`<text class="map-bed-caption" x="${(x+w/2)*10}" y="${(y+h/2)*7+28}">${escape(caption)}</text>`:''}
+            <rect class="plot-status" x="${(x+w)*10-14}" y="${y*7+6}" width="8" height="8"/>
+            ${assigned?`<g class="plot-task-alert" aria-label="You have unfinished tasks here"><rect x="${(x+w)*10-21}" y="${y*7-8}" width="26" height="26"/><text x="${(x+w)*10-8}" y="${y*7+10}">!</text></g>`:''}
             ${editingMap&&mapEditId===p.plot_id?['nw','ne','sw','se'].map(corner=>`<rect class="plot-handle ${corner}" data-corner="${corner}" x="${(x+(corner.includes('e')?w:0))*10-8}" y="${(y+(corner.includes('s')?h:0))*7-8}" width="16" height="16" rx="3" role="button" tabindex="0" aria-label="Resize ${corner} corner of ${escape(p.plot_code)} with arrow keys"/>`).join(''):''}
           </g>`;
 }
 function mapEditorToolbar() {
-  return `<div class="map-edit-toolbar" aria-label="Map editing controls"><strong>Edit map</strong><span>Drag a plot to move it. Drag a corner to resize.</span>${button(mapPlacing?'Cancel placement':'Add plot',mapPlacing?'map-place-cancel':'new-plot','','secondary small','plus')}<p id="map-edit-status" role="status">${mapPlacing?'Click an empty map space, or focus the map and press Enter, to place your new plot.':'Select a plot to edit its layout. Changes save when you release.'}</p><div id="map-edit-selection"></div></div>`;
+  return `<div class="map-edit-toolbar" aria-label="Map editing controls"><strong>Edit map</strong><span>Drag a plot to move it. Drag a corner to resize.</span>${button(mapPlacing?'Cancel placement':greenhouse()?'Add bed':'Add plot',mapPlacing?'map-place-cancel':'new-plot','','secondary small','plus')}<p id="map-edit-status" role="status">${mapPlacing?'Click an empty map space, or focus the map and press Enter, to place your new plot.':'Select a plot to edit its layout. Changes save when you release.'}</p><div id="map-edit-selection"></div></div>`;
 }
 function paintMapPlot(p,bounds=plotBounds(p)) {
   const [map_x,map_y,map_w,map_h]=bounds;
@@ -177,7 +184,7 @@ function selectMapEdit(id) {
   const p=activePlots().find(p=>p.plot_id===id);
   if(p)paintMapPlot(p);
   const panel=$('#map-edit-selection');
-  if(panel)panel.innerHTML=p?`<strong>${escape(p.plot_code)}</strong><span>Arrow keys move the plot; focus a corner and use arrow keys to resize.</span>${button('Remove plot','remove-plot',id,'secondary small danger')}`:'';
+  if(panel)panel.innerHTML=p?`<strong>${escape(p.plot_code)}</strong><span>Arrow keys move the plot; focus a corner and use arrow keys to resize.</span>${isGreenhouse(p)?`<a class="btn secondary small" href="plot-info.html?greenhouse=${p.plot_id}">Edit beds inside</a>`:''}${button('Remove plot','remove-plot',id,'secondary small danger')}`:'';
 }
 async function savePlotBounds(p,bounds) {
   mapSaving=true;
@@ -194,8 +201,9 @@ async function savePlotBounds(p,bounds) {
 }
 function placeMapPlot(point) {
   if(!editingMap||!mapPlacing||!isAdmin())return;
-  const bounds=dragPlot([0,0,15,10],point.x/10-7.5,point.y/7-5,'',mapExtent);
-  modal('Add a garden plot','Your plot will be placed here. You can move or resize it in Edit map.',`${field('Plot code','plot_code','text','','required maxlength="30" placeholder="e.g. GH-03"')}${select('Zone','zone',options(['Greenhouse','Outdoor','Nursery'].map(x=>({x})),'x','x'))}`,'plots',{bounds});
+  const house=greenhouse();
+  const bounds=dragPlot([0,0,house?30:15,house?20:10],point.x/10-(house?15:7.5),point.y/7-(house?10:5),'',mapExtent);
+  modal(house?'Add a greenhouse bed':'Add a garden plot','Place and resize rectangular spaces in Edit map. Greenhouses contain individual growing beds; open spaces contain no plants.',`${field(house?'Bed code':'Plot code','plot_code','text','','required maxlength="30" placeholder="e.g. GH-03-B2"')}${house?'':select('Space type','zone',options(['Greenhouse','Outdoor','Nursery','Open space'].map(x=>({x})),'x','x'))}`,'plots',{bounds,...(house?{zone:'Greenhouse',parent_plot_id:house.plot_id}:{})});
   mapPlacing=false;$('.garden-map')?.classList.remove('placing-plot');
   $('#map-edit-status').textContent='Complete the form to add this plot.';
 }
@@ -279,6 +287,8 @@ function zoomMap(p) {
   $('#plot-inspector')?.classList.toggle('on-left',left);
 }
 function selectMapPlot(id) {
+  const p=state.plots.find(p=>p.plot_id===id);
+  if(p&&isGreenhouse(p)){zone='All zones';navigate(`plot-info.html?greenhouse=${id}`);return;}
   if(view!=='plots'){navigate(`plot-info.html?id=${id}`);return;}
   if(selectedPlot()?.plot_id===id){closeMapPlot();return;}
   mapPan={x:0,y:0};
@@ -288,8 +298,8 @@ function selectMapPlot(id) {
   $('#plot-heading')?.focus({preventScroll:true});
 }
 function closeMapPlot() {
-  const p=selectedPlot();editingPlot=false;mapZoom=1;mapPan={x:0,y:0};
-  if(view==='plots')history.pushState({},'','plot-info.html');
+  const p=selectedPlot(),house=greenhouse();editingPlot=false;mapZoom=1;mapPan={x:0,y:0};
+  if(view==='plots')history.pushState({},'',house?`plot-info.html?greenhouse=${house.plot_id}`:'plot-info.html');
   zoomMap(null);
   const inspector=$('#plot-inspector');if(inspector)inspector.hidden=true;
   document.querySelector(`.map-plot[data-id="${p?.plot_id}"]`)?.focus({preventScroll:true});
@@ -348,6 +358,7 @@ function plotEditor(record) {
 }
 function plotCropActions(record) {
   const p=selectedPlot();
+  if(!isGrowingPlot(p))return '';
   return `<div class="plot-crop-actions"><span class="eyebrow">Manage this crop</span>${record.cycle_id?`${p.zone==='Nursery'?button('Transplant','transplant',record.cycle_id,'secondary small'):''}${button('Record harvest','harvest',record.cycle_id,'secondary small')}${button('Change assignment','cycle-assignment',record.cycle_id,'text')}`:button('Plant a crop','new-cycle',p.plot_id,'secondary small','plus')}</div>`;
 }
 async function preparePlotPhoto(file) {
@@ -398,14 +409,15 @@ window.addEventListener('resize',()=>{if(view==='plots')zoomMap(selectedPlot());
 function taskDetails(t) {
   const own=t.assigned_staff_id===state.user.user_id,pending=t.status==='Pending',due=t.scheduled_date===state.today;
   const adjustments=state.adjustments.filter(a=>a.task_id===t.task_id);
-  return `<details class="task-item" ${Number(new URLSearchParams(location.search).get('task'))===t.task_id?'open':''}><summary><span class="task-symbol">${icon(t.task_type==='Manual watering'?'drop':'tasks')}</span><span class="task-identity"><strong>${escape(t.task_type)}</strong><span>${escape(t.plot_code)} · ${escape(t.assigned_staff||'Unassigned')}</span></span><span class="task-due">${fmt(t.scheduled_date)}<small>${clock(t.scheduled_time)}</small></span>${pending?badge(t.scheduled_date<state.today?'Overdue':'Assigned','amber'):statusBadge(t.status)}<span class="task-chevron" aria-hidden="true">⌄</span></summary><div class="task-detail"><p><a href="plot-info.html?id=${t.plot_id}">Open ${escape(t.plot_code)}</a> · ${escape(t.zone)}</p>${t.substitute_staff?`<p class="reason"><strong>Covered by ${escape(t.substitute_staff)}</strong><br>${escape(t.takeover_reason)}<br>${t.is_flagged_for_admin?'Awaiting admin review':'Reviewed by admin'}</p>`:''}${adjustments.map(a=>`<p class="reason"><strong>${escape(a.action)} · ${escape(a.full_name)}</strong><br>${escape(a.reason)}<br>${escape(a.previous_schedule)}${a.new_schedule?` → ${escape(a.new_schedule)}`:''}</p>`).join('')}<div class="actions">${pending&&own&&!isAdmin()&&due?button('Mark complete','complete',t.task_id,'small','check'):''}${pending&&!isAdmin()&&!own&&t.assigned_staff_id&&due?button('Take over','takeover',t.task_id,'secondary small'):''}${pending&&own&&!isAdmin()&&t.task_type==='Manual watering'?button('Weather adjustment','adjust',t.task_id,'secondary small'):''}${pending&&isAdmin()?button('Reassign','task-assignment',t.task_id,'text'):''}${!isAdmin()&&(own||t.substitute_staff_id===state.user.user_id)?button('Message admin','task-message',t.task_id,'secondary small'):''}</div></div></details>`;
+  return `<details class="task-item" ${Number(new URLSearchParams(location.search).get('task'))===t.task_id?'open':''}><summary><span class="task-symbol">${icon(t.task_type==='Manual watering'?'drop':'tasks')}</span><span class="task-identity"><strong>${escape(t.task_type)}</strong><span>${escape(t.plot_code)} · ${escape(t.assigned_staff||'Unassigned')}</span></span><span class="task-due">${escape(t.scheduled_date>state.today?fmt(t.scheduled_date):taskDateLabel(t.scheduled_date,state.today))}<small>${clock(t.scheduled_time)}</small><small>${t.scheduled_date<=state.today?fmt(t.scheduled_date):''}</small></span>${pending?badge(t.scheduled_date<state.today?'Overdue':'Open','amber'):statusBadge(t.status)}<span class="task-chevron" aria-hidden="true">⌄</span></summary><div class="task-detail"><p><a href="plot-info.html?id=${t.plot_id}">Open ${escape(t.plot_code)}</a> · ${escape(t.zone)}</p>${t.substitute_staff?`<p class="reason"><strong>Covered by ${escape(t.substitute_staff)}</strong><br>${escape(t.takeover_reason)}<br>${t.is_flagged_for_admin?'Awaiting admin review':'Reviewed by admin'}</p>`:''}${adjustments.map(a=>`<p class="reason"><strong>${escape(a.action)} · ${escape(a.full_name)}</strong><br>${escape(a.reason)}<br>${escape(a.previous_schedule)}${a.new_schedule?` → ${escape(a.new_schedule)}`:''}</p>`).join('')}<div class="actions">${pending&&own&&!isAdmin()&&due?button('Mark complete','complete',t.task_id,'small','check'):''}${pending&&!isAdmin()&&!own&&t.assigned_staff_id&&due?button('Take over','takeover',t.task_id,'secondary small'):''}${pending&&own&&!isAdmin()&&t.task_type==='Manual watering'?button('Weather adjustment','adjust',t.task_id,'secondary small'):''}${pending&&isAdmin()?button('Reassign','task-assignment',t.task_id,'text'):''}${!isAdmin()&&(own||t.substitute_staff_id===state.user.user_id)?button('Message admin','task-message',t.task_id,'secondary small'):''}</div></div></details>`;
 }
 function tasksPage() {
-  const tasks=state.tasks.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||'',t.substitute_staff||''])&&(isAdmin()?(staffFilter==='all'||String(t.assigned_staff_id)===staffFilter):(taskScope==='all'||t.assigned_staff_id===state.user.user_id||t.substitute_staff_id===state.user.user_id))&&(taskFilter==='Done'?t.status!=='Pending':t.status==='Pending'&&(taskFilter==='Overdue'?t.scheduled_date<state.today:t.scheduled_date>=state.today)));
-  const groups=['Today','This week','Next week','Later'];
-  return heading('Maintenance tasks','Every plot gets the care it needs.',isAdmin()?button('Schedule task','new-task','','','plus'):'')+`<section class="task-board"><div class="task-toolbar">${filters(['Assigned','Overdue','Done'],taskFilter,'task-filter')}${!isAdmin()?`<label class="task-scope">Show<select id="task-scope"><option value="mine" ${taskScope==='mine'?'selected':''}>My tasks</option><option value="all" ${taskScope==='all'?'selected':''}>All team tasks</option></select></label>`:`<label class="task-scope">Show<select id="staff-filter"><option value="all">All team assignments</option>${options(state.users.filter(u=>u.role==='Staff'),'user_id','full_name',staffFilter)}</select></label>`}</div>${taskFilter!=='Assigned'?(tasks.map(taskDetails).join('')||empty('No '+taskFilter.toLowerCase()+' tasks.')):groups.map(group=>{const rows=tasks.filter(t=>taskPeriod(t.scheduled_date,state.today)===group);return `<details class="task-group" ${rows.length?'open':''}><summary><h2>${group}</h2><span>${rows.length}</span><span aria-hidden="true">⌄</span></summary><div>${rows.map(taskDetails).join('')||'<p class="task-group-empty">No tasks here.</p>'}</div></details>`;}).join('')}</section>${isAdmin()?'<button class="task-fab" data-action="new-task" aria-label="Schedule a task">'+icon('plus')+'</button>':''}`;
+  const scoped=state.tasks.filter(t=>isAdmin()?(staffFilter==='all'||String(t.assigned_staff_id)===staffFilter):(taskScope==='all'||t.assigned_staff_id===state.user.user_id||t.substitute_staff_id===state.user.user_id));
+  const tasks=scoped.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||'',t.substitute_staff||''])&&(taskFilter==='Done'?t.status!=='Pending':t.status==='Pending'&&(taskFilter!=='Overdue'||t.scheduled_date<state.today)));
+  const quietToday=!isAdmin()&&taskScope==='mine'&&taskFilter==='Open'&&!search&&!scoped.some(t=>t.status==='Pending'&&t.scheduled_date<=state.today);
+  return heading('Maintenance tasks','Dated care, with overdue tasks shown first.',isAdmin()?button('Schedule task','new-task','','','plus'):'')+`<section class="task-board"><div class="task-toolbar">${filters(['Open','Overdue','Done'],taskFilter,'task-filter')}${!isAdmin()?`<label class="task-scope">Show<select id="task-scope"><option value="mine" ${taskScope==='mine'?'selected':''}>My tasks</option><option value="all" ${taskScope==='all'?'selected':''}>All team tasks</option></select></label>`:`<label class="task-scope">Show<select id="staff-filter"><option value="all">All team assignments</option>${options(state.users.filter(u=>u.role==='Staff'),'user_id','full_name',staffFilter)}</select></label>`}</div>${quietToday?empty('Nothing due today. Your garden is in good hands.'):''}${tasks.map(taskDetails).join('')||(!quietToday?empty('No '+taskFilter.toLowerCase()+' tasks match this view.'):'')}</section>${isAdmin()?'<button class="task-fab" data-action="new-task" aria-label="Schedule a task">'+icon('plus')+'</button>':''}`;
 }
-function inventoryPage() { const plants=state.plants.filter(p=>match([p.crop_name,p.variety,p.notes])&&`${p.crop_name}${p.variety?' · '+p.variety:''}`.toLowerCase().includes(cropSearch.toLowerCase()));return heading('Crop Information','Every plot gets the care it needs.',isAdmin()?button('Add crop','new-plant','','','plus'):'')+`<div class="catalog-filter"><label for="crop-search">Find a crop or variety</label><input id="crop-search" type="search" list="crop-options" value="${escape(cropSearch)}" placeholder="View all" autocomplete="off"><datalist id="crop-options">${state.plants.map(p=>`<option value="${escape(p.crop_name+(p.variety?' · '+p.variety:''))}"></option>`).join('')}</datalist></div><section class="panel" id="crop-results" aria-live="polite">${panelHead('Crop information',`${state.plants.length} crop varieties in the garden catalog`)}${plants.length?`<div class="table-wrap"><table class="crop-table"><thead><tr><th>Crop</th><th>Variety</th><th class="numeric">Live cycles</th><th>Growing notes</th><th></th></tr></thead><tbody>${plants.map(p=>`<tr><td><strong>${escape(p.crop_name)}</strong></td><td data-label="Variety">${escape(p.variety||'—')}</td><td data-label="Live cycles" class="numeric">${state.cycles.filter(c=>c.plant_id===p.plant_id&&!c.harvest_date).length}</td><td data-label="Growing notes">${escape(p.notes||'—')}</td><td>${isAdmin()?button('Plant crop','plant-crop',p.plant_id,'secondary small'):''}</td></tr>`).join('')}</tbody></table></div>`:empty('No crops match your search.')}</section>`; }
+function inventoryPage() { const plants=state.plants.filter(p=>match([p.crop_name,p.variety,p.notes])&&`${p.crop_name} ${p.variety||''} ${p.notes||''}`.toLowerCase().includes(cropSearch.trim().toLowerCase()));return heading('Crop Information','Every plot gets the care it needs.',isAdmin()?button('Add crop','new-plant','','','plus'):'')+`<div class="catalog-filter"><label for="crop-search">Find a crop or variety</label><input id="crop-search" type="search" value="${escape(cropSearch)}" placeholder="Search crops, varieties or notes" autocomplete="off"></div><section class="panel" id="crop-results" aria-live="polite">${panelHead('Crop information',`${state.plants.length} crop varieties in the garden catalog`)}${plants.length?`<div class="table-wrap"><table class="crop-table"><thead><tr><th>Crop</th><th>Variety</th><th class="numeric">Live cycles</th><th>Growing notes</th><th></th></tr></thead><tbody>${plants.map(p=>`<tr><td><strong>${escape(p.crop_name)}</strong></td><td data-label="Variety">${escape(p.variety||'—')}</td><td data-label="Live cycles" class="numeric">${state.cycles.filter(c=>c.plant_id===p.plant_id&&!c.harvest_date).length}</td><td data-label="Growing notes">${escape(p.notes||'—')}</td><td>${isAdmin()?button('Plant crop','plant-crop',p.plant_id,'secondary small'):''}</td></tr>`).join('')}</tbody></table></div>`:empty('No crops match your search.')}</section>`; }
 function staffPage() { return heading('Staff and Access','Every plot gets the care it needs.',button('Add account','new-user','','','plus'))+`<div class="account-grid">${state.users.filter(u=>match([u.full_name,u.email,u.role])).map(u=>`<article class="person-card"><span class="avatar">${escape(initials(u.full_name))}</span><h3>${escape(u.full_name)}</h3><p>${escape(u.email)}<br>${u.role} · ${state.tasks.filter(t=>t.assigned_staff_id===u.user_id&&t.status==='Pending').length} pending tasks</p><div class="person-bottom">${badge(u.active?'Active':'Inactive',u.active?'':'gray')}${u.user_id!==state.user.user_id?button('Remove account','remove-user',u.user_id,'text danger'):'<small class="muted">Your account</small>'}</div></article>`).join('')}</div>`; }
 function modal(title,description,fields,endpoint,extra={},label='Save record') {
   const dialog=$('#modal');
@@ -426,13 +438,13 @@ function openForm(action,id) {
     modal('Remove this plot?',`Remove ${escape(p.plot_code)} from the map? Past crop and care records stay available. A plot with a live crop or pending task cannot be removed.`,'','remove-plot',{plot_id:p.plot_id,revision:p.map_revision||0,map_edit:true},'Remove plot');
   }
   if(action==='new-cycle'||action==='plant-crop') {
-    const available=activePlots().filter(p=>p.occupancy_status!=='Occupied');
+    const available=activePlots().filter(p=>isGrowingPlot(p)&&p.occupancy_status!=='Occupied');
     if(!available.length) {toast('All plots are occupied. Record a harvest or add a plot first.');return;}
     modal('Start a new crop cycle','The planting date and original plot stay with this crop throughout its life.',`${select('Crop','plant_id',options(state.plants.map(p=>({...p,label:p.crop_name+(p.variety?' · '+p.variety:'')})),'plant_id','label',action==='plant-crop'?id:''))}${select('Available plot','plot_id',options(available,'plot_id','plot_code',action==='new-cycle'?id:''))}${field('Planting date','planted_date','date',today,`required max="${today}"`)}${select('Assigned staff','assigned_staff_id',staffOptions())}`,'cycles');
     $('#f-assigned_staff_id').required=false;
   }
   if(action==='transplant') {
-    const targets=activePlots().filter(p=>p.zone!=='Nursery'&&p.occupancy_status!=='Occupied');
+    const targets=activePlots().filter(p=>isGrowingPlot(p)&&p.zone!=='Nursery'&&p.occupancy_status!=='Occupied');
     if(!targets.length) {toast('No outdoor or greenhouse plots are currently available.');return;}
     modal('A new place to grow',`${escape(cycle.crop_name)} · ${escape(cycle.origin_plot)} origin · Planted ${fmt(cycle.planted_date)}. The transplant will be dated today.`,select('Destination plot','target_plot_id',options(targets,'plot_id','plot_code')),'transplant',{cycle_id:cycle.cycle_id},'Transplant crop');
   }
@@ -442,8 +454,14 @@ function openForm(action,id) {
     $('#f-assigned_staff_id').required=false;
   }
   if(action==='new-task') {
-    modal('Schedule garden care','Use individual dated tasks for daily watering, extra sessions, and other garden care.',`<div class="form-grid">${select('Plot','plot_id',plotOptions())}${select('Task type','task_type',options(['Manual watering','Fertilizer application','Hydroponic nutrients','General maintenance'].map(x=>({x})),'x','x'))}${field('Date','scheduled_date','date',today,'required')}${field('Time (Asia/Manila)','scheduled_time','time','08:00','required')}<div class="wide">${select('Assigned staff','assigned_staff_id',staffOptions())}</div></div>`,'tasks');
+    modal('Schedule garden care','Use individual dated tasks for daily watering, extra sessions, and other garden care.',`<div class="form-grid">${select('Task type','task_type',options(['Manual watering','Fertilizer application','Hydroponic nutrients','General maintenance','Harvest'].map(x=>({x})),'x','x'))}${select('Plot','plot_id',plotOptions())}${field('Date','scheduled_date','date',today,`required min="${today}"`)}${field('Time (Asia/Manila)','scheduled_time','time','08:00','required')}<div class="wide">${select('Assigned staff','assigned_staff_id',staffOptions())}</div></div>`,'tasks');
     $('#f-assigned_staff_id').required=false;
+    const updatePlots=()=>{
+      const type=$('#f-task_type').value,previous=$('#f-plot_id').value;
+      const plots=activePlots().filter(p=>type==='General maintenance'||isGrowingPlot(p)&&(type!=='Harvest'||state.cycles.some(c=>c.current_plot_id===p.plot_id&&!c.harvest_date)));
+      $('#f-plot_id').innerHTML=options(plots,'plot_id','plot_code',previous)||'<option value="">No eligible plots</option>';
+    };
+    $('#f-task_type').addEventListener('change',updatePlots);updatePlots();
   }
   const applicationFields=task&&['Fertilizer application','Hydroponic nutrients'].includes(task.task_type)?`${field('Product applied','product','text','','required maxlength="120"')}${field('Application notes (optional)','notes','text','','maxlength="500"')}`:'';
   if(action==='task-message') modal('Message your admin',`${escape(task.task_type)} · ${escape(task.plot_code)}. Only administrators can read this message.`,textarea('Message','message'),'task-message',{task_id:task.task_id},'Send message');
@@ -469,8 +487,8 @@ document.addEventListener('click',async event=>{
   const profileMenu=$('#profile-menu');
   if(profileMenu&&!event.target.closest('.profile-wrap')){profileMenu.hidden=true;$('.profile').setAttribute('aria-expanded','false');}
   const anchor=event.target.closest('a');
-  if(anchor?.dataset.taskDate){taskFilter=anchor.dataset.taskDate<state.today?'Overdue':'Assigned';staffFilter='all';}
-  if(anchor&&state&&!['/','/index.html','/login.html'].includes(anchor.pathname)&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&anchor.origin===location.origin) {event.preventDefault();navigate(anchor.getAttribute('href'));return;}
+  if(anchor?.dataset.taskDate){taskFilter=anchor.dataset.taskDate<state.today?'Overdue':'Open';staffFilter='all';}
+  if(anchor&&state&&!['/','/index.html','/login.html'].includes(anchor.pathname)&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&anchor.origin===location.origin) {event.preventDefault();$('#modal')?.close();navigate(anchor.getAttribute('href'));return;}
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id}=target.dataset;
   try {
@@ -479,7 +497,7 @@ document.addEventListener('click',async event=>{
     if(mapSaving&&['map-edit','new-plot','remove-plot','map-place-cancel'].includes(action))return;
     if(action==='map-edit') {
       if(!isAdmin()||mapSaving)return;
-      if(!editingMap){closeMapPlot();mapExtent=Math.min(1000,Math.max(120,...activePlots().map(p=>{const [,y,,h]=plotBounds(p);return y+h+15;})));}
+      if(!editingMap){closeMapPlot();mapExtent=greenhouse()?100:Math.min(1000,Math.max(120,...mapPlots().map(p=>{const [,y,,h]=plotBounds(p);return y+h+15;})));}
       editingMap=!editingMap;mapPlacing=false;mapEditId=null;renderMain();return;
     }
     if(action==='map-place-cancel'){mapPlacing=false;renderMain();return;}
@@ -492,10 +510,15 @@ document.addEventListener('click',async event=>{
     if(action==='history-token'){const input=$('#history-query');input.value+=(input.value?' ':'')+id+':';historyQuery=input.value;input.focus();renderHistoryResults();return;}
     if(action==='zone'){zone=id;filterMap();return;}
     if(action==='task-filter'){taskFilter=id;renderMain();return;}
+    if(action==='stat-plots'){
+      const stat=overviewPlots(state)[Number(id)];if(!stat)return;
+      $('#modal').innerHTML=`<div class="modal-head"><h2>${escape(stat.label)}</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="stat-plots">${stat.plots.map(p=>`<a href="plot-info.html?id=${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(p.zone)} →</span></a>`).join('')||empty('No plots in this category.')}</div>`;
+      $('#modal').showModal();return;
+    }
     if(action==='calendar-month'){calendarOffset+=Number(id);calendarDate='';renderMain();return;}
     if(action==='calendar-day'){calendarDate=calendarDate===id?'':id;renderMain();return;}
     if(action==='calendar-clear'){calendarDate='';renderMain();return;}
-    if(action==='my-tasks'){taskFilter='Assigned';taskScope='mine';navigate('tasks.html');return;}
+    if(action==='my-tasks'){taskFilter='Open';taskScope='mine';navigate('tasks.html');return;}
     if(action==='notifications'){notifications();return;}
     if(action==='read-message'){target.disabled=true;await api('read-message',{message_id:Number(id)});await refresh();notifications();toast('Message marked as read.');return;}
     if(action==='review'){target.disabled=true;await api('review',{task_id:Number(id)});await refresh();notifications();toast('Takeover reviewed. The original record is preserved.');return;}
@@ -522,13 +545,14 @@ setInterval(async()=>{
     const next=await api('state');if(editingMap||editingPlot)return;
     const previous=new Set(notificationKeys(state));
     const incoming=notificationKeys(next).filter(key=>!previous.has(key));
+    const changed=state.today!==next.today||JSON.stringify(state.tasks)!==JSON.stringify(next.tasks)||JSON.stringify(state.plots)!==JSON.stringify(next.plots)||JSON.stringify(state.cycles)!==JSON.stringify(next.cycles);
     state=next;
     if(incoming.length) {
       toast(isAdmin()?`${incoming.length} new garden notification${incoming.length===1?'':'s'}. Open the bell to review.`:'Your task schedule has an update. Open your tasks to view it.');
       const bell=document.querySelector('[data-action="notifications"]');
       if(bell&&!bell.querySelector('.notification-dot'))bell.insertAdjacentHTML('beforeend','<span class="notification-dot"></span>');
-      if(view==='dashboard'&&!document.activeElement?.matches('input,select,textarea'))renderMain();
     }
+    if(changed&&['dashboard','tasks','plots'].includes(view)&&!document.activeElement?.matches('input,select,textarea'))renderMain();
   } catch(error) {if(state)toast('Could not refresh notifications. Check your connection.');}
   finally {polling=false;}
 },30000);
