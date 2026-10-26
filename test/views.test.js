@@ -77,6 +77,9 @@ test('greenhouse interior shows separate crops and rectangular editable beds',()
     {plot_id:2,plot_code:'BED-B',zone:'Greenhouse',parent_plot_id:30,occupancy_status:'Occupied',map_x:50,map_y:12,map_w:38,map_h:32}];
     state.cycles=[{cycle_id:1,current_plot_id:1,crop_name:'Tomato'},{cycle_id:2,current_plot_id:2,crop_name:'Chili'}]`);
   assert.equal((render('gardenMap()').match(/class="map-plot /g)||[]).length,1);
+  assert.equal(render("search='Chili';matchesPlot(state.plots[0])"),true);
+  assert.equal(render("search='Unknown crop';matchesPlot(state.plots[0])"),false);
+  render("search=''");
   const inside=render("location.search='?greenhouse=30';editingMap=true;mapEditId=2;plotsPage()");
   assert.equal((inside.match(/class="map-plot /g)||[]).length,2);
   assert.match(inside,/Tomato/);assert.match(inside,/Chili/);assert.match(inside,/Add bed/);assert.match(inside,/Back to garden/);
