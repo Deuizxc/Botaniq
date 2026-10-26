@@ -92,7 +92,8 @@ const taskTypes = [
   'Manual watering',
   'Fertilizer application',
   'Hydroponic nutrients',
-  'General maintenance'
+  'General maintenance',
+  'Harvest'
 ];
 
 // Convert "?" placeholders into PostgreSQL "$1, $2, ..."
@@ -142,7 +143,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos']) {
+  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
@@ -157,7 +158,7 @@ export async function seedDemo(dbPool, today = gardenDate()) {
   try {
     const password = '123';
     const accounts = [
-      ['CUIA Admin', 'admin@gmail.com', 'Admin', 'admin@botaniq.local'],
+      ['CUAI Admin', 'admin@gmail.com', 'Admin', 'admin@botaniq.local'],
       ['Heaven Ashley De Paz', 'heavenashley@gmail.com', 'Staff', 'mika@botaniq.local'],
       ['Brent Andrei Leur Furton', 'andreifurton@gmail.com', 'Staff', 'paolo@botaniq.local'],
       ['John Bernard Bacani', 'johntayag@gmail.com', 'Staff', 'sam@botaniq.local']
@@ -293,6 +294,8 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
     return p;
   };
 
+  const plantable = p => p.zone !== 'Open space' && (p.zone !== 'Greenhouse' || p.parent_plot_id !== null);
+
   const recentCycle = async (db, id) => {
     const cutoff = shiftDays(today(), -42);
     const c = await db.get(
@@ -363,9 +366,12 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       const bounds=b.bounds===undefined?[null,null,null,null]:geometry(b.bounds);
       await transaction(async tx=>{
         await tx.run('LOCK TABLE plots IN SHARE ROW EXCLUSIVE MODE');
+        const parent=b.parent_plot_id?await plot(tx,b.parent_plot_id):null;
+        if(parent&&(parent.zone!=='Greenhouse'||parent.parent_plot_id!==null)) fail('Choose a greenhouse for this bed.');
+        if(parent&&(b.zone!=='Greenhouse'||bounds[0]===null||bounds[1]+bounds[3]>100)) fail('Keep the bed inside its greenhouse.');
         await tx.run(
-          'INSERT INTO plots(plot_code,zone,map_slot,map_x,map_y,map_w,map_h) VALUES(?,?,(SELECT COALESCE(MAX(map_slot),27)+1 FROM plots),?,?,?,?)',
-          required(b.plot_code,'Plot code',30),choice(b.zone,['Outdoor','Greenhouse','Nursery']),...bounds
+          'INSERT INTO plots(plot_code,zone,parent_plot_id,map_slot,map_x,map_y,map_w,map_h) VALUES(?,?,?,CASE WHEN ?::integer IS NULL THEN (SELECT COALESCE(MAX(map_slot),27)+1 FROM plots) ELSE NULL END,?,?,?,?)',
+          required(b.plot_code,'Plot code',30),choice(b.zone,['Outdoor','Greenhouse','Nursery','Open space']),parent?.plot_id??null,parent?.plot_id??null,...bounds
         );
       });
     } else if (path === '/api/plot-layout' || path === '/api/remove-plot') {
@@ -375,8 +381,10 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         const p=await plot(tx,b.plot_id);
         if(!Number.isSafeInteger(b.revision)||b.revision!==p.map_revision) fail('This plot changed. Reload the map and try again.',409);
         if(path==='/api/plot-layout') {
+          if(p.parent_plot_id&&geometry(b.bounds)[1]+b.bounds[3]>100) fail('Keep the bed inside its greenhouse.');
           await tx.run('UPDATE plots SET map_x=?,map_y=?,map_w=?,map_h=?,map_revision=map_revision+1 WHERE plot_id=?',...geometry(b.bounds),p.plot_id);
         } else {
+          if(await tx.get('SELECT plot_id FROM plots WHERE parent_plot_id=? AND removed_at IS NULL',p.plot_id)) fail('Remove the greenhouse beds before removing their greenhouse.',409);
           if(await tx.get('SELECT cycle_id FROM crop_cycles WHERE current_plot_id=? AND harvest_date IS NULL',p.plot_id)) fail('Harvest or transplant the live crop before removing this plot.',409);
           if(await tx.get("SELECT task_id FROM maintenance_tasks WHERE plot_id=? AND status='Pending'",p.plot_id)) fail('Resolve pending tasks before removing this plot.',409);
           await tx.run('UPDATE plots SET removed_at=?,map_revision=map_revision+1 WHERE plot_id=?',new Date().toISOString(),p.plot_id);
@@ -386,6 +394,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       admin(user);
       await transaction(async tx => {
         const p = await plot(tx, b.plot_id);
+        if(!plantable(p)) fail('Choose a growing bed, outdoor plot or nursery.');
         if (p.occupancy_status === 'Occupied') fail('This plot is already occupied.');
         if (!(await tx.get('SELECT plant_id FROM plants WHERE plant_id=?', identifier(b.plant_id)))) {
           fail('Choose an existing crop.');
@@ -413,7 +422,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         if (c.harvest_date || source.zone !== 'Nursery' || c.transplanted_date) {
           fail('Only a live nursery cycle can be transplanted.');
         }
-        if (target.zone === 'Nursery' || target.occupancy_status === 'Occupied') {
+        if (!plantable(target) || target.zone === 'Nursery' || target.occupancy_status === 'Occupied') {
           fail('Choose an available outdoor or greenhouse plot.');
         }
         await tx.run(
@@ -452,13 +461,19 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       await transaction(async tx=>{
       const p = await plot(tx, b.plot_id);
       const assignedStaff = await staff(tx, b.assigned_staff_id);
+      const type=choice(b.task_type, taskTypes),scheduled=date(b.scheduled_date);
+      if(scheduled<today()) fail('Schedule tasks for today or a future date.');
+      if(!plantable(p)&&type!=='General maintenance') fail('Schedule crop care on a growing bed, outdoor plot or nursery.');
+      const crop=type==='Harvest'?await tx.get('SELECT cycle_id FROM crop_cycles WHERE current_plot_id=? AND harvest_date IS NULL',p.plot_id):null;
+      if(type==='Harvest'&&!crop) fail('Choose a plot with a live crop to harvest.');
       await tx.run(
-        'INSERT INTO maintenance_tasks(plot_id,task_type,scheduled_date,scheduled_time,assigned_staff_id) VALUES(?,?,?,?,?)',
+        'INSERT INTO maintenance_tasks(plot_id,task_type,scheduled_date,scheduled_time,assigned_staff_id,cycle_id) VALUES(?,?,?,?,?,?)',
         p.plot_id,
-        choice(b.task_type, taskTypes),
-        date(b.scheduled_date),
+        type,
+        scheduled,
         time(b.scheduled_time),
-        assignedStaff
+        assignedStaff,
+        crop?.cycle_id??null
       );
       });
     } else if (path === '/api/task-message') {
@@ -539,6 +554,14 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         }
         if (['/api/complete', '/api/takeover'].includes(path) && ['Fertilizer application', 'Hydroponic nutrients'].includes(task.task_type)) {
           await tx.run('INSERT INTO nutrient_logs(plot_id,staff_id,application_date,nutrient_type,product,notes,task_id,applied_at) VALUES(?,?,?,?,?,?,?,?)', task.plot_id, user.user_id, today(), task.task_type === 'Fertilizer application' ? 'Fertilizer' : 'Hydroponic nutrient', required(b.product, 'Fertilizer or nutrient product', 120), String(b.notes || '').slice(0, 500), task.task_id, new Date().toISOString());
+        }
+        if (['/api/complete', '/api/takeover'].includes(path) && task.task_type==='Harvest') {
+          await plot(tx,task.plot_id);
+          const crop=await tx.get('SELECT * FROM crop_cycles WHERE cycle_id=? AND current_plot_id=? AND harvest_date IS NULL FOR UPDATE',task.cycle_id,task.plot_id);
+          if(!crop) fail('This crop has already been harvested or moved. Ask an admin to update the task.',409);
+          if((crop.transplanted_date||crop.planted_date)>today()) fail('This crop cannot be harvested yet.');
+          await tx.run("UPDATE crop_cycles SET harvest_date=?,cycle_status='Harvested' WHERE cycle_id=?",today(),crop.cycle_id);
+          await tx.run("UPDATE plots SET occupancy_status='Harvested' WHERE plot_id=?",task.plot_id);
         }
       });
     } else if (path === '/api/review') {
@@ -770,6 +793,9 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
 
       if (!user) fail('Please sign in to continue.', 401);
 
+      // shortcut: cleanup runs on authenticated requests; add a scheduled job if idle-time deletion is needed.
+      await baseDb.run("DELETE FROM maintenance_tasks WHERE status='Pending' AND scheduled_date<=?",shiftDays(today(),-3));
+
       if (path === '/api/logout' && req.method === 'POST') {
         await baseDb.run('DELETE FROM sessions WHERE token_hash=?', digest(token));
         cookie('');
@@ -791,7 +817,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         const cutoff = shiftDays(currentToday, -42);
 
         const [plots, plants, users, cycles, tasks, adjustments, nutrients, entries, messages] = await Promise.all([
-          baseDb.all('SELECT plot_id,plot_code,zone,occupancy_status,map_slot,map_x,map_y,map_w,map_h,map_revision,removed_at,photo_version,(photo_data IS NOT NULL) AS has_photo FROM plots ORDER BY plot_code'),
+          baseDb.all('SELECT plot_id,plot_code,zone,parent_plot_id,occupancy_status,map_slot,map_x,map_y,map_w,map_h,map_revision,removed_at,photo_version,(photo_data IS NOT NULL) AS has_photo FROM plots ORDER BY plot_code'),
           baseDb.all('SELECT * FROM plants ORDER BY crop_name'),
           baseDb.all(`SELECT user_id,full_name,role,active${isAdmin ? ',email' : ''} FROM users WHERE removed_at IS NULL ORDER BY full_name`),
           baseDb.all('SELECT * FROM cycle_details ORDER BY planted_date DESC'),
