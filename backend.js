@@ -366,7 +366,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       const bounds=b.bounds===undefined?[null,null,null,null]:geometry(b.bounds);
       await transaction(async tx=>{
         await tx.run('LOCK TABLE plots IN SHARE ROW EXCLUSIVE MODE');
-        const parent=b.parent_plot_id?await plot(tx,b.parent_plot_id):null;
+        const parent=b.parent_plot_id==null?null:await plot(tx,b.parent_plot_id);
         if(parent&&(parent.zone!=='Greenhouse'||parent.parent_plot_id!==null)) fail('Choose a greenhouse for this bed.');
         if(parent&&(b.zone!=='Greenhouse'||bounds[0]===null||bounds[1]+bounds[3]>100)) fail('Keep the bed inside its greenhouse.');
         await tx.run(
@@ -437,7 +437,9 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
     } else if (path === '/api/harvest') {
       admin(user);
       await transaction(async tx => {
-        const c = await recentCycle(tx, b.cycle_id);
+        let c = await recentCycle(tx, b.cycle_id);
+        await plot(tx,c.current_plot_id);
+        c = await tx.get('SELECT * FROM crop_cycles WHERE cycle_id=? FOR UPDATE',c.cycle_id);
         const harvested = date(b.harvest_date);
         if (c.harvest_date) fail('This cycle has already been harvested.');
         if (harvested < (c.transplanted_date || c.planted_date) || harvested > today()) {
