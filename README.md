@@ -45,7 +45,7 @@ Every permission is enforced on the server, not only hidden in the interface.
 
 - **Interactive garden map**: 27 numbered plots with zoom, drag/arrow-key panning, an entrance marker, indoor/outdoor styling, and live occupancy. Plots with your unfinished tasks are flagged. A plot picker supports small screens and keyboard navigation.
 - **Admin map editing**: Enter **Edit map** to place new plots, drag plots, resize their corners, or remove a selected plot. Arrow keys move the focused plot or resize a focused corner. Each move saves on release. Removal keeps historical records and refuses plots with live crops or pending tasks. Plot details have their own separate editor.
-- **Plot overview and editing**: Each plot shows a photo, description, last watering, last harvest, and current fertilizer. Admins edit plots; staff can view every plot.
+- **Plot overview and editing**: Each plot shows a photo, description, last watering, last harvest, and current fertilizer. Admins can choose a JPG, PNG, or WebP in Edit plot details, preview it, and save it or restore the default. Uploads are resized to at most 960 pixels and 256 KB; stored photos require sign-in to view and are fetched separately from workspace state. Admins edit plots; staff can view every plot.
 - **Crop cycles**: Start, assign, harvest, and transplant crops. A cycle retains its original plot, planting date, and staff assignment for its whole life.
 - **Atomic nursery transplants**: Moving a seedling from the nursery to a plot is a single database transaction, and a partial unique index guarantees one live cycle per plot even under concurrent requests.
 - **Crop catalog**: Crops are unique by case-insensitive name and variety, with searchable dropdowns.
@@ -137,6 +137,7 @@ Versioned migrations in `migrations/` are applied automatically, once each, on s
 | `003-task-care.sql` | Adds private task messages and links fertilizer records to tasks. |
 | `004-crop-varieties.sql` | Makes crop uniqueness the trimmed, case-insensitive name and variety pair. |
 | `005-map-editor.sql` | Adds saved plot geometry, revision checks, and removal tracking without deleting history. |
+| `006-plot-photos.sql` | Adds bounded plot photo storage and version checks for simultaneous edits. |
 
 ### Demo data and accounts
 
@@ -219,7 +220,7 @@ erDiagram
 - Scrypt password hashing with unique salts
 - Server-side sessions stored as SHA-256 hashes, valid for eight hours, and revoked on password or email change and on account removal
 - `HttpOnly`, `SameSite=Strict` session cookies (`Secure` over HTTPS)
-- Cross-origin write rejection, JSON-only request bodies, and a 16 KB request size limit
+- Cross-origin write rejection, JSON-only request bodies, and a 16 KB request size limit (370 KB for plot details with a photo)
 - Strict Content Security Policy, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: same-origin`
 - Sign-in rate limiting (10 attempts per 15 minutes)
 - Server-side authorization on every write; private messages are never returned to non-admins
@@ -240,7 +241,7 @@ Botaniq/
 ├── js/
 │   ├── script.js       # Client app: routing, map, forms, search
 │   └── garden.js       # Map geometry, plot facts, history filters
-├── migrations/         # Versioned database upgrades (001-005)
+├── migrations/         # Versioned database upgrades (001-006)
 ├── test/               # accounts, app, garden, and views tests
 ├── backend.js          # HTTP server, auth, API, business rules
 ├── index.html          # Single-page application shell

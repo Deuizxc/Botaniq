@@ -1808,3 +1808,5 @@ dialog::backdrop {
 .plot-handle.nw,.plot-handle.se {cursor:nwse-resize}.plot-handle.ne,.plot-handle.sw {cursor:nesw-resize}
 .plot-handle:focus-visible {fill:#f0d875;stroke:#111;stroke-width:4;outline:none}
 .placing-plot .map-svg {cursor:crosshair}.placing-plot .map-plot {cursor:not-allowed}
+
+#plot-photo-file {max-width:100%;padding:8px 0;font-size:13px}#plot-photo-status {font-size:13px;margin:8px 0}#plot-photo-reset {margin-top:8px}

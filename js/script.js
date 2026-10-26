@@ -299,8 +299,9 @@ function timestampLabel(value) {
   if(!value.includes('T'))return `${fmt(value)} · time not recorded`;
   return new Date(value).toLocaleString('en-US',{timeZone:'Asia/Manila',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
 }
-function plotFacts(record) {
-  return `<img class="plot-photo" src="/img/testinglang.png" alt="Placeholder image for ${escape(record.crop_name)}" loading="lazy">
+const plotPhotoUrl=p=>p?.has_photo?`/api/plot-photo?id=${p.plot_id}&v=${p.photo_version}`:'/img/testinglang.png';
+function plotFacts(record,p) {
+  return `<img class="plot-photo" src="${plotPhotoUrl(p)}" alt="${p?.has_photo?'Photo of '+escape(p.plot_code):'Placeholder image for '+escape(record.crop_name)}" loading="lazy">
     <div class="plot-story"><h3>${escape(record.crop_name)}</h3><p>${escape(record.description)}</p></div>
     <dl class="plot-facts"><div><dt>${icon('drop')} Last watered</dt><dd>${escape(timestampLabel(record.watered_at))}</dd></div>
     <div><dt>${icon('sprout')} Last harvest</dt><dd>${escape(timestampLabel(record.harvested_at))}</dd></div>
@@ -313,7 +314,7 @@ function renderPlotInspector() {
   panel.innerHTML=`<div class="inspector-heading"><div><span class="eyebrow">${p.removed_at?'Removed from map':escape(p.zone)} · Plot ${p.map_slot||p.plot_id}</span><h2 id="plot-heading" tabindex="-1">${escape(p.plot_code)}</h2></div><div class="inspector-buttons">${isAdmin()&&!p.removed_at&&plotTab==='overview'&&!editingPlot?`<button class="icon-button" data-action="plot-edit" aria-label="Edit plot details">${icon('pencil')}</button>`:''}<button class="btn plot-exit" data-action="map-reset" aria-label="Exit plot details">${icon('close')} Exit plot</button></div></div>
     <div class="tabs inspector-tabs" role="tablist" aria-label="Plot information">${['overview','history'].map(tab=>`<button id="tab-${tab}" class="tab ${plotTab===tab?'active':''}" role="tab" aria-selected="${plotTab===tab}" aria-controls="plot-tab-content" tabindex="${plotTab===tab?0:-1}" data-action="plot-tab" data-id="${tab}">${tab==='overview'?'Overview':'History'}</button>`).join('')}</div>
     <div id="plot-tab-content" class="inspector-content" role="tabpanel" aria-labelledby="tab-${plotTab}">
-    ${plotTab==='history'?historyPanel(p):editingPlot&&isAdmin()&&!p.removed_at?plotEditor(record):`${plotFacts(record)}<div class="plot-state">${statusBadge(p.occupancy_status)}<span>Times in Asia/Manila</span></div>`}</div>`;
+    ${plotTab==='history'?historyPanel(p):editingPlot&&isAdmin()&&!p.removed_at?plotEditor(record):`${plotFacts(record,p)}<div class="plot-state">${statusBadge(p.occupancy_status)}<span>Times in Asia/Manila</span></div>`}</div>`;
   if(editingPlot)bindPlotEditor(p,record);
   if(plotTab==='history') {
     for(const id of ['history-query','history-fertilizer','history-from','history-to'])$('#'+id).addEventListener('input',()=>{
@@ -334,9 +335,10 @@ function historyResults(p) {
 }
 function renderHistoryResults(){const p=selectedPlot();if(p)$('#history-results').innerHTML=historyResults(p);}
 function plotEditor(record) {
+  const p=selectedPlot();
   const local=value=>value?.includes('T')?new Date(Date.parse(value)+8*3600000).toISOString().slice(0,16):'';
   const input=(label,key)=>`<div class="field"><label for="plot-${key}">${label} (Manila)</label><input id="plot-${key}" name="${key}" type="datetime-local" value="${local(record[key])}">${record[key]&&!record[key].includes('T')?`<small>Existing date: ${fmt(record[key])}. Leave blank to keep its unknown time.</small>`:''}</div>`;
-  return `<form id="plot-edit-form"><div class="field"><label for="plot-description">About this plot</label><textarea id="plot-description" name="description" required maxlength="500">${escape(record.description)}</textarea></div>
+  return `<form id="plot-edit-form"><div class="field"><label for="plot-photo-file">Plot photo</label><img id="plot-photo-preview" class="plot-photo" src="${plotPhotoUrl(p)}" alt="Photo preview for ${escape(p.plot_code)}"><input id="plot-photo-file" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="plot-photo-help"><small id="plot-photo-help">Choose a JPG, PNG, or WebP up to 10 MB. Saved photos are resized to fit.</small><button type="button" class="btn secondary small" id="plot-photo-reset">Use default image</button><p id="plot-photo-status" role="status"></p></div><div class="field"><label for="plot-description">About this plot</label><textarea id="plot-description" name="description" required maxlength="500">${escape(record.description)}</textarea></div>
     ${input('Last watered','watered_at')}${input('Last harvest','harvested_at')}
     <div class="field"><label for="plot-fertilizer-mode">Fertilizer</label><select id="plot-fertilizer-mode"><option value="none" ${!record.fertilizer?'selected':''}>None</option><option value="used" ${record.fertilizer?'selected':''}>Fertilizer used</option></select></div>
     <div id="fertilizer-fields" ${!record.fertilizer?'hidden':''}><div class="field"><label for="plot-fertilizer">Product name</label><input id="plot-fertilizer" name="fertilizer" maxlength="120" value="${escape(record.fertilizer||'')}"></div>${input('Applied','fertilized_at')}</div>
@@ -348,12 +350,36 @@ function plotCropActions(record) {
   const p=selectedPlot();
   return `<div class="plot-crop-actions"><span class="eyebrow">Manage this crop</span>${record.cycle_id?`${p.zone==='Nursery'?button('Transplant','transplant',record.cycle_id,'secondary small'):''}${button('Record harvest','harvest',record.cycle_id,'secondary small')}${button('Change assignment','cycle-assignment',record.cycle_id,'text')}`:button('Plant a crop','new-cycle',p.plot_id,'secondary small','plus')}</div>`;
 }
+async function preparePlotPhoto(file) {
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>10*1024*1024)throw new Error('Choose a JPG, PNG, or WebP image up to 10 MB.');
+  const source=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read this image.'));reader.readAsDataURL(file);});
+  const image=new Image();image.src=source;
+  try{await image.decode();}catch{throw new Error('This image could not be opened. Choose another photo.');}
+  const scale=Math.min(1,960/Math.max(image.naturalWidth,image.naturalHeight));
+  const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+  const context=canvas.getContext('2d');context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);
+  const photo=canvas.toDataURL('image/jpeg',0.8);
+  if(photo.length>349547)throw new Error('This photo is too detailed. Choose a smaller image.');
+  return photo;
+}
 function bindPlotEditor(p,record) {
+  let photo,photoError='',photoLoading=false;
+  const photoInput=$('#plot-photo-file'),photoStatus=$('#plot-photo-status'),preview=$('#plot-photo-preview'),submitButton=$('#plot-edit-form [type=submit]'),reset=$('#plot-photo-reset');
+  photoInput.addEventListener('change',async()=>{
+    const file=photoInput.files[0];if(!file)return;
+    photoLoading=true;photoError='';photoStatus.textContent='Preparing photo…';submitButton.disabled=true;photoInput.disabled=true;reset.disabled=true;
+    try{photo=await preparePlotPhoto(file);preview.src=photo;photoStatus.textContent='Photo ready. Save details to apply it.';}
+    catch(error){photoError=error.message;photoStatus.textContent=photoError;}
+    finally{photoLoading=false;submitButton.disabled=false;photoInput.disabled=false;reset.disabled=false;}
+  });
+  reset.addEventListener('click',()=>{photo=null;photoError='';photoInput.value='';preview.src='/img/testinglang.png';photoStatus.textContent='Default image selected. Save details to apply it.';});
   const toggle=()=>{const used=$('#plot-fertilizer-mode').value==='used';$('#fertilizer-fields').hidden=!used;$('#plot-fertilizer').required=used;$('#plot-fertilized_at').required=used&&!record.fertilized_at;};
   $('#plot-fertilizer-mode').addEventListener('change',toggle);toggle();
   $('#plot-edit-form').addEventListener('submit',async event=>{
     event.preventDefault();const form=event.currentTarget,submit=form.querySelector('[type=submit]');submit.disabled=true;
+    if(photoLoading||photoError){form.querySelector('.form-error').textContent=photoError||'Wait for the photo to finish.';submit.disabled=false;return;}
     const values=Object.fromEntries(new FormData(form));
+    if(photo!==undefined){values.photo_data=photo;values.photo_version=p.photo_version||0;}
     for(const key of ['watered_at','harvested_at','fertilized_at'])values[key]=values[key]?new Date(values[key]+':00+08:00').toISOString():record[key]?.includes('T')?null:record[key]||null;
     if($('#plot-fertilizer-mode').value==='none'){values.fertilizer=null;values.fertilized_at=null;}
     try{await api('plot-entry',{...values,plot_id:p.plot_id,cycle_id:record.cycle_id});editingPlot=false;await refresh();toast('Plot details saved to history.');}

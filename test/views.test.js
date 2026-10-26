@@ -72,3 +72,20 @@ test('map editing and removal controls are separate from plot details and staff 
   assert.match(edit,/x="100" y="140" width="150" height="70"/);
   assert.doesNotMatch(page('Staff')('plotsPage()'),/data-action="map-edit"|data-action="new-plot"|data-action="remove-plot"/);
 });
+
+
+test('plot photos use the authenticated endpoint and the picker stays in the details editor',()=>{
+  const render=page('Admin');
+  render("location.search='?id=2';state.plots=[{plot_id:2,plot_code:'GH-02',has_photo:true,photo_version:3}]");
+  assert.match(render("plotFacts({crop_name:'Tomato'},state.plots[0])"),/src="\/api\/plot-photo\?id=2&v=3"/);
+  assert.match(render("plotFacts({crop_name:'Tomato'})"),/src="\/img\/testinglang.png"/);
+  const editor=render("plotEditor({description:'Growing well'})");
+  assert.match(editor,/id="plot-photo-file" type="file" accept="image\/jpeg,image\/png,image\/webp"/);
+  assert.match(editor,/Use default image/);assert.doesNotMatch(editor,/data-action="remove-plot"/);
+});
+
+test('photo picker rejects unsupported files and oversized originals before decoding',async()=>{
+  const render=page('Admin');
+  await assert.rejects(render("preparePlotPhoto({type:'image/svg+xml',size:100})"),/Choose a JPG/);
+  await assert.rejects(render("preparePlotPhoto({type:'image/jpeg',size:11*1024*1024})"),/up to 10 MB/);
+});

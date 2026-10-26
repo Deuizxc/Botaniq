@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import { readFileSync } from 'node:fs';
 import { createApp, seedDemo } from '../backend.js';
 import { testDatabase } from './database.js';
 
@@ -266,4 +267,32 @@ test('admin map layout persists, rejects stale edits, and removes plots without 
   assert.equal((await request('/api/tasks',task,admin)).status,404);
   assert.equal((await request('/api/plot-layout',{...removal,revision:1,bounds:[1,2,3,4]},admin)).status,404);
   assert.equal((await request('/api/cycles',{plot_id:p.plot_id,plant_id:1,planted_date:'2026-10-19',assigned_staff_id:2},admin)).status,404);
+});
+
+
+test('plot photos require sign-in, allow only admin saves, and remain out of state payloads',async t=>{
+  const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
+  const photo='data:image/jpeg;base64,'+readFileSync(new URL('./fixtures/plot.jpg',import.meta.url)).toString('base64');
+  const entry={plot_id:2,cycle_id:null,description:'New plot photo',watered_at:null,harvested_at:null,fertilizer:null,fertilized_at:null,photo_data:photo,photo_version:0};
+  assert.equal((await request('/api/plot-photo?id=2')).status,401);
+  assert.equal((await request('/api/plot-photo?id=2',undefined,staff)).status,404);
+  assert.equal((await request('/api/plot-entry',entry)).status,401);
+  assert.equal((await request('/api/plot-entry',entry,staff)).status,403);
+  for(const invalid of ['https://example.com/picture.jpg','data:image/svg+xml;base64,PHN2Zz4=','data:image/jpeg;base64,aGVsbG8=',photo+'!','data:image/jpeg;base64,'+'A'.repeat(350000)]) {
+    assert.equal((await request('/api/plot-entry',{...entry,photo_data:invalid},admin)).status,400);
+  }
+  assert.equal((await request('/api/plot-entry',{...entry,photo_data:'A'.repeat(380000)},admin)).status,413);
+  assert.equal((await request('/api/plot-entry',entry,admin)).status,200);
+  const loaded=await request('/api/plot-photo?id=2',undefined,staff);
+  assert.equal(loaded.status,200);assert.equal(loaded.headers.get('Content-Type'),'image/jpeg');assert.equal(loaded.headers.get('Cache-Control'),'private, no-cache');
+  const saved=(await request('/api/state',undefined,staff)).body.plots.find(p=>p.plot_id===2);
+  assert.equal(saved.has_photo,true);assert.equal(saved.photo_version,1);assert.equal(saved.photo_data,undefined);
+  assert.equal((await request('/api/plot-entry',entry,admin)).status,409);
+  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM plot_entries WHERE plot_id=2')).n,1);
+  const {photo_data,photo_version,...details}=entry;
+  assert.equal((await request('/api/plot-entry',details,admin)).status,200);
+  assert.equal((await db.get('SELECT photo_version FROM plots WHERE plot_id=2')).photo_version,1);
+  assert.equal((await request('/api/plot-entry',{...entry,photo_data:null,photo_version:1},admin)).status,200);
+  assert.equal((await request('/api/plot-photo?id=2',undefined,admin)).status,404);
+  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM plot_entries WHERE plot_id=2')).n,3);
 });
