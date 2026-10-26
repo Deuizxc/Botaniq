@@ -44,7 +44,53 @@ test('crop search matches varieties and clearing it restores the full catalog fo
     assert.match(result,/Cherry/);assert.doesNotMatch(result,/Beefsteak/);
     assert.match(render("cropSearch=''; inventoryPage()").split('id="crop-results"')[1],/Beefsteak/);
     assert.match(render("cropSearch='unknown'; inventoryPage()"),/No crops match/);
+    assert.doesNotMatch(render('inventoryPage()'),/datalist|list="crop-options"/);
   }
+});
+
+test('default task list shows overdue work without date groups for both roles',()=>{
+  for(const role of ['Staff','Admin']) {
+    const render=page(role),html=render('tasksPage()');
+    assert.match(html,/GH-01/);assert.match(html,/1 day overdue/);
+    assert.doesNotMatch(html,/task-group|This week|Next week|data-id="Assigned"/);
+  }
+  const render=page();
+  assert.match(render('state.tasks=[];tasksPage()'),/Nothing due today/);
+  assert.match(render("state.tasks=[{task_id:5,plot_id:1,plot_code:'FUTURE',task_type:'Harvest',assigned_staff_id:2,status:'Pending',scheduled_date:'2026-10-24',scheduled_time:'09:00'}];tasksPage()"),/Nothing due today.*FUTURE/s);
+});
+
+test('both roles have four care drilldowns and admins have labeled daily progress',()=>{
+  for(const role of ['Staff','Admin']) {
+    const render=page(role),html=render('dashboard()');
+    assert.equal((html.match(/data-action="stat-plots"/g)||[]).length,4);
+    for(const label of ['Awaiting water','Awaiting fertilizer','Awaiting harvest','Available plots'])assert.ok(html.includes(label));
+    assert.doesNotMatch(html,/Watered plots|Harvested crops/);
+    if(role==='Admin')assert.match(html,/<progress value="0" max="1" aria-label="Garden Staff: 0 of 0 assignments completed today"/);
+  }
+});
+
+test('greenhouse interior shows separate crops and rectangular editable beds',()=>{
+  const render=page('Admin');
+  render(`state.plots=[
+    {plot_id:30,plot_code:'HOUSE',zone:'Greenhouse',occupancy_status:'Vacant',map_slot:26},
+    {plot_id:1,plot_code:'BED-A',zone:'Greenhouse',parent_plot_id:30,occupancy_status:'Occupied',map_x:8,map_y:12,map_w:38,map_h:32},
+    {plot_id:2,plot_code:'BED-B',zone:'Greenhouse',parent_plot_id:30,occupancy_status:'Occupied',map_x:50,map_y:12,map_w:38,map_h:32}];
+    state.cycles=[{cycle_id:1,current_plot_id:1,crop_name:'Tomato'},{cycle_id:2,current_plot_id:2,crop_name:'Chili'}]`);
+  assert.equal((render('gardenMap()').match(/class="map-plot /g)||[]).length,1);
+  const inside=render("location.search='?greenhouse=30';editingMap=true;mapEditId=2;plotsPage()");
+  assert.equal((inside.match(/class="map-plot /g)||[]).length,2);
+  assert.match(inside,/Tomato/);assert.match(inside,/Chili/);assert.match(inside,/Add bed/);assert.match(inside,/Back to garden/);
+  assert.doesNotMatch(inside,/<circle|REST/);
+  assert.equal((inside.match(/class="plot-handle/g)||[]).length,4);
+  assert.equal(render("location.search='?id=1';greenhouse().plot_id"),30);
+});
+
+test('removing an account opens a confirmation instead of submitting immediately',()=>{
+  const render=page('Admin');
+  const modal=JSON.parse(render("let captured;modal=(...args)=>{captured=args};openForm('remove-user',3);JSON.stringify(captured)"));
+  assert.equal(modal[0],'Remove account?');
+  assert.match(modal[1],/Other Staff.*cannot be undone/);
+  assert.equal(modal[3],'remove-user');assert.equal(modal[5],'Remove account');
 });
 
 
