@@ -38,14 +38,30 @@ export function notificationKeys(state) {
     : assignedPending(state.tasks,state.user.user_id).map(t=>`task-${t.task_id}-${t.scheduled_date}-${t.scheduled_time}`);
 }
 
-export function taskPeriod(scheduled, today) {
-  if (scheduled < today) return 'Overdue';
-  if (scheduled === today) return 'Today';
-  const now = new Date(`${today}T00:00:00Z`);
-  const endOfWeek = new Date(now.getTime() + (7 - (now.getUTCDay() || 7)) * 86400000).toISOString().slice(0, 10);
-  if (scheduled <= endOfWeek) return 'This week';
-  const endOfNextWeek = new Date(Date.parse(endOfWeek) + 7 * 86400000).toISOString().slice(0, 10);
-  return scheduled <= endOfNextWeek ? 'Next week' : 'Later';
+export const isGreenhouse = plot => plot.zone === 'Greenhouse' && !plot.parent_plot_id;
+export const isGrowingPlot = plot => !plot.removed_at && plot.zone !== 'Open space' && !isGreenhouse(plot);
+
+export function taskDateLabel(scheduled, today) {
+  const days = Math.round((Date.parse(today) - Date.parse(scheduled)) / 86400000);
+  return days === 0 ? 'Today' : days > 0 ? `${days} day${days === 1 ? '' : 's'} overdue` : scheduled;
+}
+
+export function dailyProgress(tasks, userId, today) {
+  const assigned = tasks.filter(t => t.assigned_staff_id === userId && t.scheduled_date === today);
+  const completed = assigned.filter(t => t.status === 'Completed' && !t.substitute_staff_id && localDate(t.completed_at) === today).length;
+  return { total: assigned.length, completed };
+}
+
+export function overviewPlots(state) {
+  const due = type => new Set(state.tasks.filter(t => t.status === 'Pending' && t.task_type === type && t.scheduled_date <= state.today).map(t => t.plot_id));
+  const water = due('Manual watering'), fertilizer = due('Fertilizer application'), harvest = due('Harvest');
+  const plots = state.plots.filter(p => !p.removed_at);
+  return [
+    {label: 'Awaiting water', plots: plots.filter(p => water.has(p.plot_id))},
+    {label: 'Awaiting fertilizer', plots: plots.filter(p => fertilizer.has(p.plot_id))},
+    {label: 'Awaiting harvest', plots: plots.filter(p => harvest.has(p.plot_id))},
+    {label: 'Available plots', plots: plots.filter(p => isGrowingPlot(p) && p.occupancy_status !== 'Occupied')}
+  ];
 }
 
 export function calendarMonth(today, offset, tasks) {
