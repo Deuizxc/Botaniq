@@ -1,5 +1,16 @@
 # BotaniQ redesign verification
 
+## October 27 garden care update
+
+- Four map space types, rectangular greenhouse beds with independent crops and layouts, and removal of the REST landmark and circular map markers.
+- Shared overview drilldowns for awaiting water/fertilizer/harvest and available planting plots; daily admin staff progress; flat Open/Overdue/Done task views and a friendly staff empty state.
+- Harvest tasks bind to the original crop cycle. Pending tasks expire at three Manila calendar days overdue on the next authenticated request; completed care and crop history remain.
+- Crop Information filters directly by name, variety or notes. Existing account removal confirmation remains. Seeded and existing CUIA Admin names migrate to CUAI Admin.
+- `npm test`: **48 passed, 0 failed**, including migration preservation, authorization, greenhouse containment, stale edits, harvest conflicts, expiry boundaries, daily progress and renderer checks. HTTP tests required loopback access outside the restricted sandbox.
+- Isolated browser workflows passed: create greenhouse, add two beds, resize with the keyboard, plant distinct crops, search crops, schedule a harvest as admin and complete it as staff, open all four overview cards, and check the dialog's accessible title.
+- Admin and staff pages checked at **1440, 768 and 390 px**: no horizontal page overflow or browser exceptions. Computed map label/background contrast is at least **4.5:1**. Screenshots reviewed; mobile map labels were enlarged after the first review.
+- Screenshots are local, ignored evidence in `.taste-skill/care-update/`. Production deployment and production migration execution were not checked; all test data used an isolated in-memory database.
+
 ## October 23 reference update
 
 - Applied the supplied landing, login, logo, and flower-header assets while retaining the existing navigation.
