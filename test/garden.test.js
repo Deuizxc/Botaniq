@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapPosition, plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskPeriod, calendarMonth, notificationKeys } from '../js/garden.js';
+import { mapPosition, plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, calendarMonth, notificationKeys } from '../js/garden.js';
 
 const plot={plot_id:1,plot_code:'GH-01'};
 const cycle={cycle_id:1,current_plot_id:1,origin_plot_id:1,crop_name:'Tomato',planted_date:'2026-01-01',harvest_date:'2026-02-01'};
@@ -41,12 +41,25 @@ test('calendar and map mark only the current staff member unfinished assignments
   assert.equal(month.cells.find(c=>c?.day===17).count,0);
   assert.equal(calendarMonth('2024-01-31',1,[]).cells.filter(Boolean).length,29);
   assert.equal(calendarMonth('2026-12-01',1,[]).label,'January 2027');
-  assert.equal(taskPeriod('2026-10-21','2026-10-22'),'Overdue');
-  assert.equal(taskPeriod('2026-10-22','2026-10-22'),'Today');
-  assert.equal(taskPeriod('2026-10-25','2026-10-22'),'This week');
-  assert.equal(taskPeriod('2026-10-26','2026-10-22'),'Next week');
-  assert.equal(taskPeriod('2026-11-02','2026-10-22'),'Later');
+  assert.equal(taskDateLabel('2026-10-21','2026-10-22'),'1 day overdue');
+  assert.equal(taskDateLabel('2026-10-22','2026-10-22'),'Today');
+  assert.equal(taskDateLabel('2026-10-20','2026-10-22'),'2 days overdue');
+  assert.equal(taskDateLabel('2026-10-25','2026-10-22'),'2026-10-25');
   assert.deepEqual(notificationKeys({tasks,user:{role:'Staff',user_id:2},messages:[{message_id:1}]}),['task-1-2026-10-15-08:00']);
+});
+
+test('daily progress counts only own assignments completed on the same Manila day',()=>{
+  const task={assigned_staff_id:2,scheduled_date:'2026-10-22',status:'Completed',completed_at:'2026-10-21T16:00:00Z'};
+  const tasks=[task,{...task,status:'Pending',completed_at:null},{...task,substitute_staff_id:3},{...task,completed_at:'2026-10-22T16:00:00Z'},{...task,scheduled_date:'2026-10-21'},{...task,assigned_staff_id:3}];
+  assert.deepEqual(dailyProgress(tasks,2,'2026-10-22'),{total:4,completed:1});
+  assert.deepEqual(dailyProgress(tasks,9,'2026-10-22'),{total:0,completed:0});
+});
+
+test('overview lists deduplicate due plots and exclude containers and open spaces from availability',()=>{
+  const plots=[{plot_id:1,zone:'Outdoor',occupancy_status:'Occupied'},{plot_id:2,zone:'Greenhouse',parent_plot_id:3,occupancy_status:'Vacant'},{plot_id:3,zone:'Greenhouse',occupancy_status:'Vacant'},{plot_id:4,zone:'Open space',occupancy_status:'Vacant'},{plot_id:5,zone:'Nursery',occupancy_status:'Harvested'},{plot_id:6,zone:'Outdoor',removed_at:'2026-10-01'}];
+  const task={plot_id:1,status:'Pending',scheduled_date:'2026-10-22',task_type:'Manual watering'};
+  const tasks=[task,task,{...task,task_type:'Fertilizer application'},{...task,task_type:'Harvest'}, {...task,plot_id:2,scheduled_date:'2026-10-23'},{...task,plot_id:5,status:'Completed'}];
+  assert.deepEqual(overviewPlots({plots,tasks,today:'2026-10-22'}).map(s=>s.plots.map(p=>p.plot_id)),[[1],[1],[1],[2,5]]);
 });
 
 test('fertilizer completion appears in current overview and permanent history',()=>{
