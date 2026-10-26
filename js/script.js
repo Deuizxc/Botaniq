@@ -32,6 +32,11 @@ let plotTab = 'overview', editingPlot = false, historyQuery = '', historyFertili
 const selectedPlot = () => state?.plots.find(p => p.plot_id === Number(new URLSearchParams(location.search).get('id')));
 const greenhouse = () => state?.plots.find(p => isGreenhouse(p) && p.plot_id === (selectedPlot()?.parent_plot_id || Number(new URLSearchParams(location.search).get('greenhouse'))));
 const mapPlots = () => activePlots().filter(p => (p.parent_plot_id || null) === (greenhouse()?.plot_id || null));
+const matchesPlot = p => {
+  const beds=activePlots().filter(b=>b.parent_plot_id===p.plot_id);
+  const crops=state.cycles.filter(c=>!c.harvest_date&&(c.current_plot_id===p.plot_id||beds.some(b=>b.plot_id===c.current_plot_id)));
+  return (zone==='All zones'||zone===p.zone)&&match([p.plot_code,p.zone,...beds.map(b=>b.plot_code),...crops.map(c=>`${c.crop_name} ${c.variety||''}`)]);
+};
 const isAdmin = () => state.user.role === 'Admin';
 const initials = name => name.split(' ').slice(0,2).map(x => x[0]).join('');
 const fmt = value => value ? new Date(`${value.slice(0,10)}T00:00:00Z`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'}) : '—';
@@ -112,8 +117,7 @@ function taskCalendar(pending) {
 function filterMap() {
   document.querySelectorAll('.map-plot').forEach(el=>{
     const p=state.plots.find(p=>p.plot_id===Number(el.dataset.id));
-    const crop=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);
-    el.classList.toggle('dimmed',(zone!=='All zones'&&zone!==p.zone)||!match([p.plot_code,p.zone,crop?.crop_name||'']));
+    el.classList.toggle('dimmed',!matchesPlot(p));
   });
   document.querySelectorAll('[data-action="zone"]').forEach(el=>{
     el.classList.toggle('active',el.dataset.id===zone);
@@ -139,7 +143,7 @@ function gardenMap(compact=false) {
         <rect x="0" y="0" width="1000" height="${height}" fill="url(#map-grain)" rx="28"/>
         ${house?'':`<path class="map-path-edge" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
         <path class="map-path" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
-        
+
         <g class="map-entrance"><text x="638" y="674">Entrance</text><path d="M713 669h17m-8-7 8 7-8 7"/></g>`}
         ${plots.map(mapPlotMarkup).join('')}
       </g>
@@ -154,7 +158,7 @@ function mapPlotMarkup(p) {
           const beds=activePlots().filter(b=>b.parent_plot_id===p.plot_id);
           const caption=isGreenhouse(p)?`${beds.length} bed${beds.length===1?'':'s'}`:p.zone==='Open space'?'No planting':c?.crop_name||'Available for planting';
           const occupancy=isGreenhouse(p)?(beds.some(b=>b.occupancy_status==='Occupied')?'Occupied':'Vacant'):p.occupancy_status;
-          const muted=(zone!=='All zones'&&zone!==p.zone)||!match([p.plot_code,p.zone,c?.crop_name||'']);
+          const muted=!matchesPlot(p);
           const assigned=assignedPending(state.tasks,state.user.user_id).some(t=>t.plot_id===p.plot_id||beds.some(b=>b.plot_id===t.plot_id));
           return `<g class="map-plot ${p.zone.toLowerCase().replace(' ','-')} ${occupancy.toLowerCase()} ${muted?'dimmed':''}" data-action="map-plot" data-id="${p.plot_id}" role="button" tabindex="0" aria-pressed="${editingMap&&mapEditId===p.plot_id}" aria-label="Plot ${slot}, ${escape(p.plot_code)}, ${escape(caption)}">
             <title>${escape(p.plot_code)} · ${escape(caption)} · ${p.zone}</title>
@@ -320,6 +324,7 @@ function plotFacts(record,p) {
 function renderPlotInspector() {
   const panel=$('#plot-inspector'),p=selectedPlot();if(!panel||!p)return;
   const c=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date),record=plotOverview(state,p,c);
+  if(p.zone==='Open space'){record.crop_name='Open space';if(!state.entries.some(e=>e.plot_id===p.plot_id))record.description='Unplanted space for access, storage or other garden use.';}
   panel.hidden=false;
   panel.innerHTML=`<div class="inspector-heading"><div><span class="eyebrow">${p.removed_at?'Removed from map':escape(p.zone)} · Plot ${p.map_slot||p.plot_id}</span><h2 id="plot-heading" tabindex="-1">${escape(p.plot_code)}</h2></div><div class="inspector-buttons">${isAdmin()&&!p.removed_at&&plotTab==='overview'&&!editingPlot?`<button class="icon-button" data-action="plot-edit" aria-label="Edit plot details">${icon('pencil')}</button>`:''}<button class="btn plot-exit" data-action="map-reset" aria-label="Exit plot details">${icon('close')} Exit plot</button></div></div>
     <div class="tabs inspector-tabs" role="tablist" aria-label="Plot information">${['overview','history'].map(tab=>`<button id="tab-${tab}" class="tab ${plotTab===tab?'active':''}" role="tab" aria-selected="${plotTab===tab}" aria-controls="plot-tab-content" tabindex="${plotTab===tab?0:-1}" data-action="plot-tab" data-id="${tab}">${tab==='overview'?'Overview':'History'}</button>`).join('')}</div>
