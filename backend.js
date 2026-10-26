@@ -73,6 +73,21 @@ function choice(value, list) {
   return value;
 }
 
+function plotPhoto(value) {
+  if(value===null)return null;
+  if(typeof value!=='string'||value.length>350000||!/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) fail('Choose a JPEG photo under 256 KB.');
+  const encoded=value.slice('data:image/jpeg;base64,'.length),bytes=Buffer.from(encoded,'base64');
+  if(bytes.length>262144||bytes.length<4||bytes.toString('base64')!==encoded||bytes[0]!==255||bytes[1]!==216||bytes[2]!==255||bytes.at(-2)!==255||bytes.at(-1)!==217) fail('Choose a valid JPEG photo.');
+  return value;
+}
+
+function geometry(value) {
+  if(!Array.isArray(value)||value.length!==4||!value.every(n=>typeof n==='number'&&Number.isFinite(n))) fail('Choose a valid plot position and size.');
+  const [x,y,w,h]=value;
+  if(x<0||y<0||w<3||h<3||x+w>100||y+h>1000) fail('Keep the plot inside the map with a minimum size of 3 by 3.');
+  return value;
+}
+
 const taskTypes = [
   'Manual watering',
   'Fertilizer application',
@@ -127,7 +142,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties']) {
+  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
@@ -273,7 +288,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
   };
 
   const plot = async (db, id) => {
-    const p = await db.get('SELECT * FROM plots WHERE plot_id=?', identifier(id));
+    const p = await db.get('SELECT * FROM plots WHERE plot_id=? AND removed_at IS NULL FOR UPDATE', identifier(id));
     if (!p) fail('Plot not found.', 404);
     return p;
   };
@@ -316,6 +331,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
     } else if (path === '/api/plot-entry') {
       admin(user);
       const description = required(b.description, 'Description', 500);
+      const photo=b.photo_data===undefined?undefined:plotPhoto(b.photo_data);
       const timestamp = (value, label) => {
         if (value === null || value === '') return null;
         if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}\.\d{3}Z)?$/.test(value)) fail(`Enter a valid ${label}.`);
@@ -330,8 +346,9 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       const fertilized = timestamp(b.fertilized_at, 'fertilizer time');
       if (Boolean(fertilizer) !== Boolean(fertilized)) fail('Choose None, or supply both fertilizer and application time.');
       await transaction(async tx => {
-        const p = await tx.get('SELECT * FROM plots WHERE plot_id=? FOR UPDATE', identifier(b.plot_id));
+        const p = await tx.get('SELECT * FROM plots WHERE plot_id=? AND removed_at IS NULL FOR UPDATE', identifier(b.plot_id));
         if (!p) fail('Plot not found.', 404);
+        if(photo!==undefined&&(!Number.isSafeInteger(b.photo_version)||b.photo_version!==p.photo_version)) fail('The plot photo changed. Reopen the plot and try again.',409);
         const cycle = await tx.get('SELECT cycle_id FROM crop_cycles WHERE current_plot_id=? AND harvest_date IS NULL', p.plot_id);
         const expectedCycle = b.cycle_id === null ? null : identifier(b.cycle_id);
         if ((cycle?.cycle_id ?? null) !== expectedCycle) fail('The crop changed while you were editing. Reopen the plot and try again.', 409);
@@ -339,14 +356,32 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           'INSERT INTO plot_entries(plot_id,cycle_id,description,watered_at,harvested_at,fertilizer,fertilized_at,recorded_at,recorded_by) VALUES(?,?,?,?,?,?,?,?,?)',
           p.plot_id, expectedCycle, description, watered, harvested, fertilizer, fertilized, new Date().toISOString(), user.user_id
         );
+        if(photo!==undefined)await tx.run('UPDATE plots SET photo_data=?,photo_version=photo_version+1 WHERE plot_id=?',photo,p.plot_id);
       });
     } else if (path === '/api/plots') {
       admin(user);
-      await baseDb.run(
-        'INSERT INTO plots(plot_code,zone,map_slot) VALUES(?,?,(SELECT COALESCE(MAX(map_slot),27)+1 FROM plots))',
-        required(b.plot_code, 'Plot code', 30),
-        choice(b.zone, ['Outdoor', 'Greenhouse', 'Nursery'])
-      );
+      const bounds=b.bounds===undefined?[null,null,null,null]:geometry(b.bounds);
+      await transaction(async tx=>{
+        await tx.run('LOCK TABLE plots IN SHARE ROW EXCLUSIVE MODE');
+        await tx.run(
+          'INSERT INTO plots(plot_code,zone,map_slot,map_x,map_y,map_w,map_h) VALUES(?,?,(SELECT COALESCE(MAX(map_slot),27)+1 FROM plots),?,?,?,?)',
+          required(b.plot_code,'Plot code',30),choice(b.zone,['Outdoor','Greenhouse','Nursery']),...bounds
+        );
+      });
+    } else if (path === '/api/plot-layout' || path === '/api/remove-plot') {
+      admin(user);
+      if(b.map_edit!==true) fail('Enter Edit map mode first.',409);
+      await transaction(async tx=>{
+        const p=await plot(tx,b.plot_id);
+        if(!Number.isSafeInteger(b.revision)||b.revision!==p.map_revision) fail('This plot changed. Reload the map and try again.',409);
+        if(path==='/api/plot-layout') {
+          await tx.run('UPDATE plots SET map_x=?,map_y=?,map_w=?,map_h=?,map_revision=map_revision+1 WHERE plot_id=?',...geometry(b.bounds),p.plot_id);
+        } else {
+          if(await tx.get('SELECT cycle_id FROM crop_cycles WHERE current_plot_id=? AND harvest_date IS NULL',p.plot_id)) fail('Harvest or transplant the live crop before removing this plot.',409);
+          if(await tx.get("SELECT task_id FROM maintenance_tasks WHERE plot_id=? AND status='Pending'",p.plot_id)) fail('Resolve pending tasks before removing this plot.',409);
+          await tx.run('UPDATE plots SET removed_at=?,map_revision=map_revision+1 WHERE plot_id=?',new Date().toISOString(),p.plot_id);
+        }
+      });
     } else if (path === '/api/cycles') {
       admin(user);
       await transaction(async tx => {
@@ -414,9 +449,10 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       await baseDb.run('UPDATE crop_cycles SET assigned_staff_id=? WHERE cycle_id=?', assignedStaff, c.cycle_id);
     } else if (path === '/api/tasks') {
       admin(user);
-      const p = await plot(baseDb, b.plot_id);
-      const assignedStaff = await staff(baseDb, b.assigned_staff_id);
-      await baseDb.run(
+      await transaction(async tx=>{
+      const p = await plot(tx, b.plot_id);
+      const assignedStaff = await staff(tx, b.assigned_staff_id);
+      await tx.run(
         'INSERT INTO maintenance_tasks(plot_id,task_type,scheduled_date,scheduled_time,assigned_staff_id) VALUES(?,?,?,?,?)',
         p.plot_id,
         choice(b.task_type, taskTypes),
@@ -424,6 +460,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         time(b.scheduled_time),
         assignedStaff
       );
+      });
     } else if (path === '/api/task-message') {
       if (user.role !== 'Staff') fail('Only staff can send a task message.', 403);
       const task = await baseDb.get('SELECT * FROM maintenance_tasks WHERE task_id=?', identifier(b.task_id));
@@ -440,7 +477,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         if (!task) fail('Task not found.', 404);
         if (task.status !== 'Pending') fail('This task is already closed.', 409);
         if (['/api/complete', '/api/takeover'].includes(path) && task.scheduled_date < today()) {
-          fail('Missing tasks cannot be completed.', 409);
+          fail('Overdue tasks cannot be completed.', 409);
         }
         if (path === '/api/task-assignment') {
           admin(user);
@@ -661,6 +698,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         req.headers['x-forwarded-proto'] === 'https' ||
         Boolean(process.env.VERCEL);
 
+      const bodyLimit=path==='/api/plot-entry'?370000:16384;
       let b = {};
       if (req.method === 'POST') {
         if (req.headers.origin && req.headers.origin !== `${isSecure ? 'https' : 'http'}://${req.headers.host}`) {
@@ -673,7 +711,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           let raw = '';
           for await (const chunk of req) {
             raw += chunk;
-            if (Buffer.byteLength(raw) > 16384) fail('Request too large.', 413);
+            if (Buffer.byteLength(raw) > bodyLimit) fail('Request too large.', 413);
           }
           try {
             b = JSON.parse(raw);
@@ -682,6 +720,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           }
         }
         if (!b || typeof b !== 'object' || Array.isArray(b)) fail('Invalid request.');
+        if(Buffer.byteLength(JSON.stringify(b))>bodyLimit)fail('Request too large.',413);
       }
 
       const token = /(?:^|; )botaniq_session=([^;]+)/.exec(req.headers.cookie || '')?.[1];
@@ -738,13 +777,21 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         return;
       }
 
+      if(req.method==='GET'&&path==='/api/plot-photo') {
+        if(!user)fail('Please sign in to continue.',401);
+        const p=await baseDb.get('SELECT photo_data FROM plots WHERE plot_id=?',identifier(url.searchParams.get('id')));
+        if(!p?.photo_data)fail('Plot photo not found.',404);
+        res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'private, no-cache'});
+        res.end(Buffer.from(p.photo_data.split(',')[1],'base64'));return;
+      }
+
       if (req.method === 'GET' && path === '/api/state') {
         const isAdmin = user.role === 'Admin';
         const currentToday = today();
         const cutoff = shiftDays(currentToday, -42);
 
         const [plots, plants, users, cycles, tasks, adjustments, nutrients, entries, messages] = await Promise.all([
-          baseDb.all('SELECT * FROM plots ORDER BY plot_code'),
+          baseDb.all('SELECT plot_id,plot_code,zone,occupancy_status,map_slot,map_x,map_y,map_w,map_h,map_revision,removed_at,photo_version,(photo_data IS NOT NULL) AS has_photo FROM plots ORDER BY plot_code'),
           baseDb.all('SELECT * FROM plants ORDER BY crop_name'),
           baseDb.all(`SELECT user_id,full_name,role,active${isAdmin ? ',email' : ''} FROM users WHERE removed_at IS NULL ORDER BY full_name`),
           baseDb.all('SELECT * FROM cycle_details ORDER BY planted_date DESC'),

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapPosition, plotOverview, plotHistory, filterHistory, assignedPending, taskPeriod, calendarMonth, notificationKeys } from '../js/garden.js';
+import { mapPosition, plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskPeriod, calendarMonth, notificationKeys } from '../js/garden.js';
 
 const plot={plot_id:1,plot_code:'GH-01'};
 const cycle={cycle_id:1,current_plot_id:1,origin_plot_id:1,crop_name:'Tomato',planted_date:'2026-01-01',harvest_date:'2026-02-01'};
@@ -86,4 +86,17 @@ test('cleared care fields stay empty until a newer care event is recorded',()=>{
   assert.equal(cleared.harvested_at,null);
   const tasks=[...state.tasks,{plot_id:1,task_type:'Manual watering',status:'Completed',completed_at:'2026-04-02T01:00:00.000Z'}];
   assert.equal(plotOverview({...state,entries,tasks},plot).watered_at,'2026-04-02T01:00:00.000Z');
+});
+
+
+test('plot layout uses saved bounds and clamps moves and all resize corners',()=>{
+  assert.deepEqual(plotBounds({map_slot:26}),mapPosition(26));
+  assert.deepEqual(plotBounds({map_slot:26,map_x:0,map_y:2,map_w:8,map_h:9}),[0,2,8,9]);
+  assert.deepEqual(dragPlot([10,20,15,10],-100,200,'',120),[0,110,15,10]);
+  assert.deepEqual(dragPlot([10,20,15,10],4,5,'nw'),[14,25,11,5]);
+  assert.deepEqual(dragPlot([10,20,15,10],4,5,'ne'),[10,25,19,5]);
+  assert.deepEqual(dragPlot([10,20,15,10],4,5,'sw'),[14,20,11,15]);
+  assert.deepEqual(dragPlot([10,20,15,10],4,5,'se'),[10,20,19,15]);
+  assert.deepEqual(dragPlot([10,20,15,10],100,100,'nw'),[22,27,3,3]);
+  assert.deepEqual(dragPlot([10,20,15,10],100,100,'se'),[10,20,90,80]);
 });
