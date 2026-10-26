@@ -1816,6 +1816,7 @@ dialog::backdrop {
 body {font-size:16px}
 .nav a,.btn,.filter,.tab,.catalog-filter input,.crop-table,.task-detail {font-size:16px}
 .panel-head p,.footer,.field label,.catalog-filter label,.task-due small {font-size:14px;color:#485440}
+.modal-body>p,.field small,.review-row p,.editor-note,.notice {color:#485440}
 .care-stats .stat {text-align:left;color:#23341c;background:#d9e3cf;cursor:pointer}
 .care-stats .stat-top {font-size:18px;color:#23341c;overflow-wrap:anywhere}
 .care-stats .stat-value,.care-stats .stat-foot {color:#23341c}
