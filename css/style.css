@@ -195,15 +195,6 @@ small {
   margin-left:232px;
   min-height:100vh
 }
-.topbar {
-  height:84px;
-  border-bottom:1px solid var(--line);
-  background:#fcfcf8;
-  display:flex;
-  align-items:center;
-  padding:0 38px;
-  gap:22px
-}
 .breadcrumb {
   display:flex;
   align-items:center;
@@ -1721,7 +1712,7 @@ dialog::backdrop {
 .layout {background:#f0efe9;position:relative;isolation:isolate}
 .layout:before {content:'';position:absolute;inset:0 0 auto;height:270px;background:linear-gradient(#162c2270,#162c2260),url('/img/mainpage_bg.png') center 46%/cover;z-index:-1}
 .layout:has(.overview-page):before {height:340px}
-.topbar {background:transparent;border:0;color:#fff}
+.topbar {background:rgba(18,36,25,0.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.14);color:#fff;display:flex;align-items:center;padding:0 clamp(24px,3vw,58px);gap:20px;position:sticky;top:0;z-index:8}
 .topbar .breadcrumb,.topbar .breadcrumb strong,.topbar .profile small,.topbar>.icon-button {color:#fff}
 .topbar .profile-menu {color:var(--dark)}
 .topbar>.icon-button:hover {background:#ffffff25}
