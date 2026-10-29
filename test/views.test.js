@@ -126,11 +126,34 @@ test('map editing and removal controls are separate from plot details and staff 
 test('plot photos use the authenticated endpoint and the picker stays in the details editor',()=>{
   const render=page('Admin');
   render("location.search='?id=2';state.plots=[{plot_id:2,plot_code:'GH-02',has_photo:true,photo_version:3}]");
-  assert.match(render("plotFacts({crop_name:'Tomato'},state.plots[0])"),/src="\/api\/plot-photo\?id=2&v=3"/);
-  assert.match(render("plotFacts({crop_name:'Tomato'})"),/src="\/img\/testinglang.png"/);
+  assert.match(render("plotFacts({crop_name:'Tomato'},state.plots[0])"),/src="\/api\/plot-photo\?id=2&amp;v=3"/);
+  for(const plot of ['undefined','{has_photo:false}']) {
+    const empty=render(`plotFacts({crop_name:'Tomato'},${plot})`);
+    assert.match(empty,/No Image Available/);assert.match(empty,/<svg aria-hidden="true"/);assert.doesNotMatch(empty,/<img/);
+  }
   const editor=render("plotEditor({description:'Growing well'})");
   assert.match(editor,/id="plot-photo-file" type="file" accept="image\/jpeg,image\/png,image\/webp"/);
-  assert.match(editor,/Use default image/);assert.doesNotMatch(editor,/data-action="remove-plot"/);
+  assert.match(editor,/Remove Image/);assert.doesNotMatch(editor,/data-action="remove-plot"/);
+  assert.match(render("state.plots[0].has_photo=false;plotEditor({description:'Growing well'})"),/No Image Available/);
+  assert.doesNotMatch(editor,/default image|testinglang/);
+});
+
+test('removing a photo clears the preview and submits a versioned deletion',async()=>{
+  const render=page('Admin');
+  await render(`
+    const elements={};
+    document.querySelector=selector=>elements[selector]??=( {value:'',addEventListener(event,handler){this[event]=handler}} );
+    FormData=class { *[Symbol.iterator](){} };
+    let submitted;
+    api=async(action,values)=>{submitted=values};refresh=async()=>{};toast=()=>{};
+    bindPlotEditor({plot_id:2,plot_code:'GH-02',has_photo:true,photo_version:3},{});
+    elements['#plot-photo-reset'].click();
+    elements['#plot-edit-form'].submit({preventDefault(){},currentTarget:{querySelector:document.querySelector}});
+  `);
+  assert.match(render("elements['#plot-photo-preview'].innerHTML"),/No Image Available/);
+  assert.doesNotMatch(render("elements['#plot-photo-preview'].innerHTML"),/<img/);
+  assert.equal(render('submitted.photo_data'),null);
+  assert.equal(render('submitted.photo_version'),3);
 });
 
 test('photo picker rejects unsupported files and oversized originals before decoding',async()=>{
