@@ -15,5 +15,8 @@
     { "source": "/staff.html", "destination": "/index.html" },
     { "source": "/archive.html", "destination": "/index.html" },
     { "source": "/nutrients.html", "destination": "/index.html" }
+  ],
+  "routes": [
+    { "src": "/\\.git/.*", "dest": "/404" }
   ]
 }
