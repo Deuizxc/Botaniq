@@ -229,11 +229,11 @@ small {
   display:flex;
   align-items:center;
   gap:9px;
-  background:#f9fbf6;
-  border:0;
-  border-radius:999px;
-  padding:10px 16px;
-  width:250px;
+  background:#f1f3ec;
+  border:1px solid #e9ece3;
+  border-radius:6px;
+  padding:9px 13px;
+  width:235px;
   color:#8d9587
 }
 .search svg {
@@ -549,6 +549,10 @@ small {
   background:#fcfdf9;
   text-align:left;
   transition:transform .15s,border-color .15s
+}
+.plot-card:hover {
+  transform:translateY(-2px);
+  border-color:#aabd8c
 }
 .plot-card.vacant {
   background:#fafbf7;
@@ -1873,88 +1877,4 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
   .team-row {padding:16px 12px;gap:8px}.team-row .avatar {display:none}.team-progress {width:105px}
   .task-identity {flex-basis:100%}.task-due {text-align:left;max-width:none;font-size:16px}
   .care-stats .stat-top {font-size:16px}.care-stats .stat {min-width:0}
-}
-
-/* UI Animation Enhancements */
-.panel, .stat, .plot-card, .task-card, .person-card, .atlas-task {
-  animation: view-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-/* Stagger panel loading */
-.care-stats .stat:nth-child(1) { animation-delay: 0.05s; }
-.care-stats .stat:nth-child(2) { animation-delay: 0.1s; }
-.care-stats .stat:nth-child(3) { animation-delay: 0.15s; }
-.care-stats .stat:nth-child(4) { animation-delay: 0.2s; }
-
-.dashboard-grid .panel:nth-child(1), .care-grid .panel:nth-child(1) { animation-delay: 0.1s; }
-.dashboard-grid .panel:nth-child(2), .care-grid .panel:nth-child(2) { animation-delay: 0.2s; }
-
-.plot-grid .plot-card:nth-child(1) { animation-delay: 0.05s; }
-.plot-grid .plot-card:nth-child(2) { animation-delay: 0.1s; }
-.plot-grid .plot-card:nth-child(3) { animation-delay: 0.15s; }
-.plot-grid .plot-card:nth-child(4) { animation-delay: 0.2s; }
-.plot-grid .plot-card:nth-child(5) { animation-delay: 0.25s; }
-.plot-grid .plot-card:nth-child(6) { animation-delay: 0.3s; }
-
-/* Enhanced card hover physics */
-.plot-card {
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s ease, box-shadow 0.25s ease;
-}
-.plot-card:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 12px 24px -6px rgba(36, 59, 43, 0.15);
-}
-
-.task-card, .person-card {
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
-}
-.task-card:hover, .person-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 14px 28px -6px rgba(36, 59, 43, 0.12);
-}
-
-/* Map hover enhancements */
-.map-plot {
-  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transform-origin: center;
-  transform-box: fill-box;
-}
-.map-plot:hover:not(.vacant):not(.open-space) {
-  transform: scale(1.02);
-}
-
-/* Button micro-interactions */
-.btn, .icon-button {
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, box-shadow 0.2s ease;
-}
-.btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(36, 59, 43, 0.2);
-}
-.btn:active, .icon-button:active {
-  transform: translateY(1px) scale(0.96);
-}
-
-/* Checkbox pop */
-.task-check {
-  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.task-check:hover {
-  transform: scale(1.15);
-}
-.task-row:hover .task-check {
-  border-color: var(--green);
-}
-
-/* Smooth row hover states */
-.care-row, .team-row, .atlas-task {
-  transition: background-color 0.2s ease, transform 0.2s ease;
-}
-.care-row:hover, .team-row:hover {
-  background-color: #f7f9f3;
-  transform: translateX(4px);
-}
-.atlas-task:hover {
-  background-color: #f2f5eb;
-  padding-left: 26px;
 }
