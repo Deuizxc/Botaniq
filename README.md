@@ -146,4 +146,3 @@ Botaniq/
 
 ---
 
-**Authors:** [@Deuizxc](https://github.com/Deuizxc) and [@inferism](https://github.com/inferism) · Built for CUAI, Quezon City University · License: add yours here (e.g. MIT)
