@@ -313,9 +313,11 @@ function timestampLabel(value) {
   if(!value.includes('T'))return `${fmt(value)} · time not recorded`;
   return new Date(value).toLocaleString('en-US',{timeZone:'Asia/Manila',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
 }
-const plotPhotoUrl=p=>p?.has_photo?`/api/plot-photo?id=${p.plot_id}&v=${p.photo_version}`:'/img/testinglang.png';
+function plotPhoto(p,src=p?.has_photo?`/api/plot-photo?id=${p.plot_id}&v=${p.photo_version}`:null) {
+  return src?`<img class="plot-photo" src="${escape(src)}" alt="Photo of ${escape(p.plot_code)}" loading="lazy">`:`<div class="plot-photo plot-photo-empty">${icon('sprout')}<span>No Image Available</span></div>`;
+}
 function plotFacts(record,p) {
-  return `<img class="plot-photo" src="${plotPhotoUrl(p)}" alt="${p?.has_photo?'Photo of '+escape(p.plot_code):'Placeholder image for '+escape(record.crop_name)}" loading="lazy">
+  return `${plotPhoto(p)}
     <div class="plot-story"><h3>${escape(record.crop_name)}</h3><p>${escape(record.description)}</p></div>
     <dl class="plot-facts"><div><dt>${icon('drop')} Last watered</dt><dd>${escape(timestampLabel(record.watered_at))}</dd></div>
     <div><dt>${icon('sprout')} Last harvest</dt><dd>${escape(timestampLabel(record.harvested_at))}</dd></div>
@@ -353,7 +355,7 @@ function plotEditor(record) {
   const p=selectedPlot();
   const local=value=>value?.includes('T')?new Date(Date.parse(value)+8*3600000).toISOString().slice(0,16):'';
   const input=(label,key)=>`<div class="field"><label for="plot-${key}">${label} (Manila)</label><input id="plot-${key}" name="${key}" type="datetime-local" value="${local(record[key])}">${record[key]&&!record[key].includes('T')?`<small>Existing date: ${fmt(record[key])}. Leave blank to keep its unknown time.</small>`:''}</div>`;
-  return `<form id="plot-edit-form"><div class="field"><label for="plot-photo-file">Plot photo</label><img id="plot-photo-preview" class="plot-photo" src="${plotPhotoUrl(p)}" alt="Photo preview for ${escape(p.plot_code)}"><input id="plot-photo-file" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="plot-photo-help"><small id="plot-photo-help">Choose a JPG, PNG, or WebP up to 10 MB. Saved photos are resized to fit.</small><button type="button" class="btn secondary small" id="plot-photo-reset">Use default image</button><p id="plot-photo-status" role="status"></p></div><div class="field"><label for="plot-description">About this plot</label><textarea id="plot-description" name="description" required maxlength="500">${escape(record.description)}</textarea></div>
+  return `<form id="plot-edit-form"><div class="field"><label for="plot-photo-file">Plot photo</label><div id="plot-photo-preview">${plotPhoto(p)}</div><input id="plot-photo-file" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="plot-photo-help"><small id="plot-photo-help">Choose a JPG, PNG, or WebP up to 10 MB. Saved photos are resized to fit.</small><button type="button" class="btn secondary small" id="plot-photo-reset">Remove Image</button><p id="plot-photo-status" role="status"></p></div><div class="field"><label for="plot-description">About this plot</label><textarea id="plot-description" name="description" required maxlength="500">${escape(record.description)}</textarea></div>
     ${input('Last watered','watered_at')}${input('Last harvest','harvested_at')}
     <div class="field"><label for="plot-fertilizer-mode">Fertilizer</label><select id="plot-fertilizer-mode"><option value="none" ${!record.fertilizer?'selected':''}>None</option><option value="used" ${record.fertilizer?'selected':''}>Fertilizer used</option></select></div>
     <div id="fertilizer-fields" ${!record.fertilizer?'hidden':''}><div class="field"><label for="plot-fertilizer">Product name</label><input id="plot-fertilizer" name="fertilizer" maxlength="120" value="${escape(record.fertilizer||'')}"></div>${input('Applied','fertilized_at')}</div>
@@ -384,11 +386,11 @@ function bindPlotEditor(p,record) {
   photoInput.addEventListener('change',async()=>{
     const file=photoInput.files[0];if(!file)return;
     photoLoading=true;photoError='';photoStatus.textContent='Preparing photo…';submitButton.disabled=true;photoInput.disabled=true;reset.disabled=true;
-    try{photo=await preparePlotPhoto(file);preview.src=photo;photoStatus.textContent='Photo ready. Save details to apply it.';}
+    try{photo=await preparePlotPhoto(file);preview.innerHTML=plotPhoto(p,photo);photoStatus.textContent='Photo ready. Save details to apply it.';}
     catch(error){photoError=error.message;photoStatus.textContent=photoError;}
     finally{photoLoading=false;submitButton.disabled=false;photoInput.disabled=false;reset.disabled=false;}
   });
-  reset.addEventListener('click',()=>{photo=null;photoError='';photoInput.value='';preview.src='/img/testinglang.png';photoStatus.textContent='Default image selected. Save details to apply it.';});
+  reset.addEventListener('click',()=>{photo=null;photoError='';photoInput.value='';preview.innerHTML=plotPhoto(p,null);photoStatus.textContent='Image removed. Save details to apply it.';});
   const toggle=()=>{const used=$('#plot-fertilizer-mode').value==='used';$('#fertilizer-fields').hidden=!used;$('#plot-fertilizer').required=used;$('#plot-fertilized_at').required=used&&!record.fertilized_at;};
   $('#plot-fertilizer-mode').addEventListener('change',toggle);toggle();
   $('#plot-edit-form').addEventListener('submit',async event=>{
