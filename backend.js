@@ -143,7 +143,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care']) {
+  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
@@ -271,7 +271,6 @@ export async function seedDemo(dbPool, today = gardenDate()) {
 }
 
 export function createHandler(dbPool, { today = gardenDate, secure = false } = {}) {
-  const attempts = new Map();
   const baseDb = createRunner(dbPool);
 
   const admin = user => {
@@ -403,13 +402,14 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         if (planted > today()) fail('Planting date cannot be in the future.');
         const assignedStaff = await staff(tx, b.assigned_staff_id);
         await tx.run(
-          'INSERT INTO crop_cycles(plant_id,origin_plot_id,current_plot_id,assigned_staff_id,planted_date,cycle_status) VALUES(?,?,?,?,?,?)',
+          'INSERT INTO crop_cycles(plant_id,origin_plot_id,current_plot_id,assigned_staff_id,planted_date,cycle_status,planting_stage) VALUES(?,?,?,?,?,?,?)',
           identifier(b.plant_id),
           p.plot_id,
           p.plot_id,
           assignedStaff,
           planted,
-          p.zone === 'Nursery' ? 'In Nursery' : 'Active in Plot'
+          p.zone === 'Nursery' ? 'In Nursery' : 'Active in Plot',
+          choice(b.planting_stage, ['Seedling','Fully grown plant'])
         );
         await tx.run("UPDATE plots SET occupancy_status='Occupied' WHERE plot_id=?", p.plot_id);
       });
@@ -482,13 +482,16 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       if (user.role !== 'Staff') fail('Only staff can send a task message.', 403);
       const task = await baseDb.get('SELECT * FROM maintenance_tasks WHERE task_id=?', identifier(b.task_id));
       if (!task) fail('Task not found.', 404);
-      if (![task.assigned_staff_id, task.substitute_staff_id].includes(user.user_id)) fail('You can message the admin about your own tasks only.', 403);
+      if (task.assigned_staff_id !== user.user_id) fail('You can message the admin about your own tasks only.', 403);
       await baseDb.run('INSERT INTO task_messages(task_id,staff_id,message,created_at) VALUES(?,?,?,?)', task.task_id, user.user_id, required(b.message, 'Message', 1000), new Date().toISOString());
     } else if (path === '/api/read-message') {
       admin(user);
       const result = await baseDb.run('UPDATE task_messages SET read_at=? WHERE message_id=?', new Date().toISOString(), identifier(b.message_id));
       if (!result.changes) fail('Message not found.', 404);
-    } else if (['/api/complete', '/api/takeover', '/api/adjust', '/api/task-assignment'].includes(path)) {
+    } else if (path === '/api/read-invite') {
+      const result = await baseDb.run('UPDATE coverage_invites SET is_read=true WHERE invite_id=? AND staff_id=?', identifier(b.invite_id), user.user_id);
+      if (!result.changes) fail('Coverage request is no longer available.', 404);
+    } else if (['/api/request-cover', '/api/complete', '/api/takeover', '/api/adjust', '/api/task-assignment'].includes(path)) {
       await transaction(async tx => {
         const task = await tx.get('SELECT * FROM maintenance_tasks WHERE task_id=? FOR UPDATE', identifier(b.task_id));
         if (!task) fail('Task not found.', 404);
@@ -496,24 +499,31 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         if (['/api/complete', '/api/takeover'].includes(path) && task.scheduled_date < today()) {
           fail('Overdue tasks cannot be completed.', 409);
         }
+        if (path === '/api/request-cover') {
+          if (user.role !== 'Admin' && task.assigned_staff_id !== user.user_id) fail('Only the assignee or admin can request cover.',403);
+          if (task.scheduled_date < today()) fail('This task is overdue.',409);
+          const result = await tx.run(`INSERT INTO coverage_invites(task_id,staff_id)
+            SELECT ?,user_id FROM users WHERE active=1 AND role='Staff' AND user_id IS DISTINCT FROM ?::integer
+            ON CONFLICT DO NOTHING`,task.task_id,task.assigned_staff_id);
+          if (!result.changes) fail('No additional staff are available to notify.',409);
+          return;
+        }
         if (path === '/api/task-assignment') {
           admin(user);
           const assignedStaff = await staff(tx, b.assigned_staff_id);
+          await tx.run('DELETE FROM coverage_invites WHERE task_id=?',task.task_id);
           await tx.run('UPDATE maintenance_tasks SET assigned_staff_id=? WHERE task_id=?', assignedStaff, task.task_id);
           return;
         }
         if (path === '/api/takeover') {
-          if (user.role !== 'Staff' || !task.assigned_staff_id || task.assigned_staff_id === user.user_id) {
-            fail('Take over a task assigned to another staff member.', 403);
-          }
-          if (task.scheduled_date > today()) fail('A future task cannot be completed yet.');
-          await tx.run(
-            "UPDATE maintenance_tasks SET substitute_staff_id=?,takeover_reason=?,status='Completed',is_flagged_for_admin=1,completed_at=? WHERE task_id=?",
-            user.user_id,
-            required(b.takeover_reason, 'Takeover reason'),
-            new Date().toISOString(),
-            task.task_id
-          );
+          if (user.role !== 'Staff' || task.assigned_staff_id === user.user_id) fail('Choose a coverage request from another assignee.',403);
+          const invite = await tx.get('SELECT invite_id FROM coverage_invites WHERE task_id=? AND staff_id=? AND invite_id=?',task.task_id,user.user_id,identifier(b.invite_id));
+          if (!invite) fail('This coverage request is no longer available.',409);
+          await tx.run(`UPDATE maintenance_tasks SET covered_for_id=assigned_staff_id,assigned_staff_id=?,substitute_staff_id=?,
+            takeover_reason=?,is_flagged_for_admin=1,reviewed_at=NULL,reviewed_by=NULL WHERE task_id=?`,
+            user.user_id,user.user_id,required(b.takeover_reason,'Takeover reason'),task.task_id);
+          await tx.run('DELETE FROM coverage_invites WHERE task_id=?',task.task_id);
+          return;
         } else {
           if (user.role !== 'Admin' && task.assigned_staff_id !== user.user_id) {
             fail('Only the assigned staff member can update this task.', 403);
@@ -554,10 +564,11 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
             }
           }
         }
-        if (['/api/complete', '/api/takeover'].includes(path) && ['Fertilizer application', 'Hydroponic nutrients'].includes(task.task_type)) {
+        if (path === '/api/complete' || b.action === 'Skip') await tx.run('DELETE FROM coverage_invites WHERE task_id=?',task.task_id);
+        if (path === '/api/complete' && ['Fertilizer application', 'Hydroponic nutrients'].includes(task.task_type)) {
           await tx.run('INSERT INTO nutrient_logs(plot_id,staff_id,application_date,nutrient_type,product,notes,task_id,applied_at) VALUES(?,?,?,?,?,?,?,?)', task.plot_id, user.user_id, today(), task.task_type === 'Fertilizer application' ? 'Fertilizer' : 'Hydroponic nutrient', required(b.product, 'Fertilizer or nutrient product', 120), String(b.notes || '').slice(0, 500), task.task_id, new Date().toISOString());
         }
-        if (['/api/complete', '/api/takeover'].includes(path) && task.task_type==='Harvest') {
+        if (path === '/api/complete' && task.task_type==='Harvest') {
           await plot(tx,task.plot_id);
           const crop=await tx.get('SELECT * FROM crop_cycles WHERE cycle_id=? AND current_plot_id=? AND harvest_date IS NULL FOR UPDATE',task.cycle_id,task.plot_id);
           if(!crop) fail('This crop has already been harvested or moved. Ask an admin to update the task.',409);
@@ -767,22 +778,30 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
 
       if (path === '/api/login' && req.method === 'POST') {
         const key = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
-        for (const [ip, entry] of attempts) if (entry.until < Date.now()) attempts.delete(ip);
-        const attempt = attempts.get(key) || { count: 0, until: Date.now() + 900000 };
-        if (attempt.count >= 10) fail('Too many sign-in attempts. Try again in 15 minutes.', 429);
-        attempt.count++;
-        attempts.set(key, attempt);
-
         const email = required(b.email, 'Email', 150).toLowerCase();
         const password = b.password;
         if (typeof password !== 'string' || !password.length || password.length > 128) {
           fail('Enter a valid password.');
         }
-        const account = await baseDb.get('SELECT * FROM users WHERE email=? AND active=1', email);
-        if (!account || !verifyPassword(password, account.password_hash)) {
-          fail('Email or password is incorrect.', 401);
-        }
-        attempts.delete(key);
+        const result = await transaction(async tx => {
+          const now = Date.now();
+          const expires = now + 15 * 60 * 1000;
+          await tx.run('DELETE FROM login_failures WHERE expires_at<=?',now);
+          const attempt = await tx.get(`INSERT INTO login_failures(client_key,expires_at) VALUES(?,?)
+            ON CONFLICT(client_key) DO UPDATE SET client_key=EXCLUDED.client_key RETURNING failures`,key,expires);
+          if (attempt.failures >= 3) return { locked: true };
+          const account = await tx.get('SELECT * FROM users WHERE email=? AND active=1',email);
+          if (!account || !verifyPassword(password,account.password_hash)) {
+            await tx.run(`UPDATE login_failures SET failures=failures+1,
+              expires_at=CASE WHEN failures=2 THEN ? ELSE expires_at END WHERE client_key=?`,expires,key);
+            return { locked: attempt.failures === 2 };
+          }
+          await tx.run('DELETE FROM login_failures WHERE client_key=?',key);
+          return { account };
+        });
+        if (result.locked) fail('Too many sign-in attempts. Try again in 15 minutes.',429);
+        if (!result.account) fail('Email or password is incorrect.',401);
+        const account = result.account;
 
         const value = randomBytes(32).toString('hex');
         await baseDb.run('DELETE FROM sessions WHERE expires_at<?', Date.now());
@@ -818,22 +837,25 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         const currentToday = today();
         const cutoff = shiftDays(currentToday, -42);
 
-        const [plots, plants, users, cycles, tasks, adjustments, nutrients, entries, messages] = await Promise.all([
+        const [plots, plants, users, cycles, tasks, adjustments, nutrients, entries, messages, invites] = await Promise.all([
           baseDb.all('SELECT plot_id,plot_code,zone,parent_plot_id,occupancy_status,map_slot,map_x,map_y,map_w,map_h,map_revision,removed_at,photo_version,(photo_data IS NOT NULL) AS has_photo FROM plots ORDER BY plot_code'),
           baseDb.all('SELECT * FROM plants ORDER BY crop_name'),
           baseDb.all(`SELECT user_id,full_name,role,active${isAdmin ? ',email' : ''} FROM users WHERE removed_at IS NULL ORDER BY full_name`),
-          baseDb.all('SELECT * FROM cycle_details ORDER BY planted_date DESC'),
+          baseDb.all('SELECT d.*,c.planting_stage FROM cycle_details d JOIN crop_cycles c USING(cycle_id) ORDER BY d.planted_date DESC'),
           baseDb.all(
-            'SELECT t.*,p.plot_code,p.zone,u.full_name AS assigned_staff,s.full_name AS substitute_staff FROM maintenance_tasks t JOIN plots p ON t.plot_id=p.plot_id LEFT JOIN users u ON t.assigned_staff_id=u.user_id LEFT JOIN users s ON t.substitute_staff_id=s.user_id ORDER BY scheduled_date,scheduled_time'
+            `SELECT t.*,p.plot_code,p.zone,u.full_name AS assigned_staff,s.full_name AS substitute_staff,prev.full_name AS covered_for FROM maintenance_tasks t JOIN plots p ON t.plot_id=p.plot_id LEFT JOIN users u ON t.assigned_staff_id=u.user_id LEFT JOIN users s ON t.substitute_staff_id=s.user_id LEFT JOIN users prev ON prev.user_id=t.covered_for_id WHERE (? OR t.assigned_staff_id=?) ORDER BY scheduled_date,scheduled_time`,isAdmin,user.user_id
           ),
           baseDb.all(
-            'SELECT a.*,u.full_name FROM task_adjustments a JOIN users u ON a.staff_id=u.user_id ORDER BY adjustment_id DESC'
+            'SELECT a.*,u.full_name FROM task_adjustments a JOIN users u ON a.staff_id=u.user_id JOIN maintenance_tasks t ON t.task_id=a.task_id WHERE (? OR t.assigned_staff_id=?) ORDER BY adjustment_id DESC',isAdmin,user.user_id
           ),
           baseDb.all(
             'SELECT n.*,p.plot_code,u.full_name FROM nutrient_logs n JOIN plots p ON n.plot_id=p.plot_id JOIN users u ON n.staff_id=u.user_id ORDER BY application_date DESC,log_id DESC'
           ),
           baseDb.all('SELECT * FROM plot_entries ORDER BY entry_id DESC'),
-          isAdmin ? baseDb.all('SELECT m.*,u.full_name,p.plot_code,t.task_type FROM task_messages m JOIN users u ON m.staff_id=u.user_id JOIN maintenance_tasks t ON m.task_id=t.task_id JOIN plots p ON t.plot_id=p.plot_id ORDER BY m.message_id DESC') : Promise.resolve([])
+          isAdmin ? baseDb.all('SELECT m.*,u.full_name,p.plot_code,t.task_type FROM task_messages m JOIN users u ON m.staff_id=u.user_id JOIN maintenance_tasks t ON m.task_id=t.task_id JOIN plots p ON t.plot_id=p.plot_id ORDER BY m.message_id DESC') : Promise.resolve([]),
+          isAdmin ? [] : baseDb.all(`SELECT i.invite_id,i.task_id,i.is_read,t.task_type,t.scheduled_date,t.scheduled_time,p.plot_code
+            FROM coverage_invites i JOIN maintenance_tasks t USING(task_id) JOIN plots p USING(plot_id)
+            WHERE i.staff_id=? AND t.status='Pending' AND t.scheduled_date>=? ORDER BY i.invite_id DESC`,user.user_id,currentToday)
         ]);
 
         json({
@@ -848,7 +870,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           adjustments,
           nutrients,
           entries,
-          messages
+          messages, invites
         });
         return;
       }
