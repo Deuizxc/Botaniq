@@ -35,7 +35,7 @@ export const assignedPending = (tasks, userId) => tasks.filter(t => t.status ===
 export function notificationKeys(state) {
   return state.user.role === 'Admin'
     ? [...state.tasks.filter(t=>t.is_flagged_for_admin).map(t=>`takeover-${t.task_id}`), ...(state.messages||[]).filter(m=>!m.read_at).map(m=>`message-${m.message_id}`)]
-    : assignedPending(state.tasks,state.user.user_id).map(t=>`task-${t.task_id}-${t.scheduled_date}-${t.scheduled_time}`);
+    : [...assignedPending(state.tasks,state.user.user_id).map(t=>`task-${t.task_id}-${t.scheduled_date}-${t.scheduled_time}`), ...(state.invites||[]).map(i=>`invite-${i.invite_id}`)];
 }
 
 export const isGreenhouse = plot => plot.zone === 'Greenhouse' && !plot.parent_plot_id;
@@ -48,7 +48,7 @@ export function taskDateLabel(scheduled, today) {
 
 export function dailyProgress(tasks, userId, today) {
   const assigned = tasks.filter(t => t.assigned_staff_id === userId && t.scheduled_date === today);
-  const completed = assigned.filter(t => t.status === 'Completed' && !t.substitute_staff_id && localDate(t.completed_at) === today).length;
+  const completed = assigned.filter(t => t.status === 'Completed' && (!t.substitute_staff_id || t.covered_for_id || t.substitute_staff_id===userId) && localDate(t.completed_at) === today).length;
   return { total: assigned.length, completed };
 }
 

@@ -1880,3 +1880,13 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
   .task-identity {flex-basis:100%}.task-due {text-align:left;max-width:none;font-size:16px}
   .care-stats .stat-top {font-size:16px}.care-stats .stat {min-width:0}
 }
+.notification-count {
+  position:absolute; top:-3px; right:-5px; min-width:18px; padding:1px 4px;
+  border-radius:12px; background:#a33725; color:white; font:bold 12px/16px sans-serif;
+  text-align:center; animation:coverage-ping 1.8s ease-out infinite;
+}
+@keyframes coverage-ping {
+  from {box-shadow:0 0 0 0 rgba(163,55,37,.55)}
+  to {box-shadow:0 0 0 7px rgba(163,55,37,0)}
+}
+@media (prefers-reduced-motion:reduce) { .notification-count {animation:none} }

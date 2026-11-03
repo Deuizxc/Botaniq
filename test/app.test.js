@@ -100,19 +100,42 @@ test('transplant is atomic and preserves identity, origin and planting date',asy
   assert.equal((await db.get('SELECT occupancy_status AS s FROM plots WHERE plot_id=2')).s,'Occupied');
   assert.equal((await request('/api/transplant',{cycle_id:4,target_plot_id:6},admin)).status,400);
 });
-test('staff takeover requires a reason, preserves assignee, and raises an admin flag',async t=>{
+test('staff takeover requires a reason, transfers the pending task, and raises an admin flag',async t=>{
   const {db,request,login}=await fixture(t),staff=await login('heavenashley@gmail.com');
-  assert.equal((await request('/api/takeover',{task_id:3,takeover_reason:'  '},staff)).status,400);
+  const admin=await login();
+  const before=(await request('/api/state',undefined,staff)).body;
+  assert.ok(before.tasks.every(t=>t.assigned_staff_id===2));
+  assert.equal((await request('/api/request-cover',{task_id:3},staff)).status,403);
+  assert.equal((await request('/api/request-cover',{task_id:3},admin)).status,200);
+  const [invite]=(await request('/api/state',undefined,staff)).body.invites;
+  const claim={task_id:3,invite_id:invite.invite_id,takeover_reason:'Brent is absent.'};
+  assert.equal(invite.is_read,false);
+  assert.equal((await request('/api/read-invite',claim,staff)).status,200);
+  assert.equal((await request('/api/state',undefined,staff)).body.invites[0].is_read,true);
+  assert.equal((await request('/api/takeover',{...claim,takeover_reason:' '},staff)).status,400);
   assert.equal((await request('/api/complete',{task_id:3},staff)).status,403);
-  assert.equal((await request('/api/takeover',{task_id:1,takeover_reason:'My own task'},staff)).status,403);
-  assert.equal((await request('/api/takeover',{task_id:3,takeover_reason:'Brent is absent.'},staff)).status,200);
-  const task=(await db.get('SELECT * FROM maintenance_tasks WHERE task_id=3'));
-  assert.equal(task.assigned_staff_id,3);assert.equal(task.substitute_staff_id,2);assert.equal(task.is_flagged_for_admin,1);assert.equal(task.status,'Completed');assert.ok(task.completed_at);
-  assert.equal((await request('/api/takeover',{task_id:3,takeover_reason:'Again'},staff)).status,409);
+  assert.equal((await request('/api/takeover',claim,staff)).status,200);
+  const after=(await request('/api/state',undefined,staff)).body;
+  assert.deepEqual(after.invites,[]);
+  const task=after.tasks.find(t=>t.task_id===3);
+  assert.equal(task.covered_for_id,3);assert.equal(task.assigned_staff_id,2);assert.equal(task.is_flagged_for_admin,1);
+  assert.equal(task.status,'Pending');assert.equal(task.completed_at,null);
+  assert.equal((await request('/api/complete',{task_id:3},staff)).status,200);
   assert.equal((await request('/api/review',{task_id:3},staff)).status,403);
-  const admin=await login();assert.equal((await request('/api/review',{task_id:3},admin)).status,200);
+  assert.equal((await request('/api/review',{task_id:3},admin)).status,200);
   const reviewed=(await db.get('SELECT * FROM maintenance_tasks WHERE task_id=3'));
   assert.equal(reviewed.takeover_reason,'Brent is absent.');assert.ok(reviewed.reviewed_at);assert.equal(reviewed.is_flagged_for_admin,0);
+});
+test('admin reassignment cancels outstanding requests and switches private queues',async t=>{
+  const {request,login}=await fixture(t),admin=await login(),owner=await login('andreifurton@gmail.com'),helper=await login('heavenashley@gmail.com');
+  assert.equal((await request('/api/request-cover',{task_id:3},owner)).status,200);
+  const invite=(await request('/api/state',undefined,helper)).body.invites[0];
+  assert.equal((await request('/api/task-assignment',{task_id:3,assigned_staff_id:4},admin)).status,200);
+  assert.equal((await request('/api/takeover',{task_id:3,invite_id:invite.invite_id,takeover_reason:'Available'},helper)).status,409);
+  assert.deepEqual((await request('/api/state',undefined,helper)).body.invites,[]);
+  assert.ok(!(await request('/api/state',undefined,owner)).body.tasks.some(t=>t.task_id===3));
+  const recipient=await login('johntayag@gmail.com');
+  assert.equal((await request('/api/state',undefined,recipient)).body.tasks.find(t=>t.task_id===3).status,'Pending');
 });
 test('weather adjustments retain a schedule audit and cannot change unrelated staff tasks',async t=>{
   const {db,request,login}=await fixture(t),staff=await login('heavenashley@gmail.com');
@@ -129,9 +152,11 @@ test('harvest, replacement, assignment and date validation preserve history',asy
   assert.equal((await request('/api/harvest',{cycle_id:1,harvest_date:'2026-02-30'},admin)).status,400);
   assert.equal((await request('/api/harvest',{cycle_id:1,harvest_date:'2026-10-20'},admin)).status,400);
   assert.equal((await request('/api/harvest',{cycle_id:1,harvest_date:'2026-10-19'},admin)).status,200);
-  assert.equal((await request('/api/cycles',{plot_id:1,plant_id:4,planted_date:'2026-10-19',assigned_staff_id:3},admin)).status,200);
-  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM crop_cycles WHERE current_plot_id=1')).n,2);
   assert.equal((await request('/api/cycles',{plot_id:1,plant_id:4,planted_date:'2026-10-19',assigned_staff_id:3},admin)).status,400);
+  assert.equal((await request('/api/cycles',{plot_id:1,plant_id:4,planting_stage:'Seedling',planted_date:'2026-10-19',assigned_staff_id:3},admin)).status,200);
+  assert.equal((await request('/api/state',undefined,admin)).body.cycles.find(c=>c.cycle_id===8).planting_stage,'Seedling');
+  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM crop_cycles WHERE current_plot_id=1')).n,2);
+  assert.equal((await request('/api/cycles',{plot_id:1,plant_id:4,planting_stage:'Seedling',planted_date:'2026-10-19',assigned_staff_id:3},admin)).status,400);
   assert.equal((await request('/api/cycle-assignment',{cycle_id:8,assigned_staff_id:''},admin)).status,200);
   assert.equal((await db.get('SELECT assigned_staff_id FROM crop_cycles WHERE cycle_id=8')).assigned_staff_id,null);
 });
@@ -172,9 +197,12 @@ test('competing transplants cannot double-book a plot',async t=>{
   assert.equal((await db.get("SELECT COUNT(*)::int AS n FROM plots WHERE zone='Nursery' AND occupancy_status='Occupied'")).n,1);
 });
 test('repeated bad logins are rate-limited',async t=>{
-  const {request}=await fixture(t);
-  for(let i=0;i<10;i++) assert.equal((await request('/api/login',{email:'unknown@example.com',password:'incorrect'})).status,401);
+  const {request,password,db}=await fixture(t);
+  for(let i=0;i<2;i++) assert.equal((await request('/api/login',{email:'unknown@example.com',password:'incorrect'})).status,401);
   assert.equal((await request('/api/login',{email:'unknown@example.com',password:'incorrect'})).status,429);
+  assert.equal((await request('/api/login',{email:'admin@gmail.com',password})).status,429);
+  await db.query('UPDATE login_failures SET expires_at=0');
+  assert.equal((await request('/api/login',{email:'admin@gmail.com',password})).status,200);
 });
 
 test('garden migration preserves existing plots and creates 27 unique map positions once',async t=>{
@@ -207,7 +235,7 @@ test('greenhouses contain independently planted, editable beds and open spaces c
   assert.equal((await request('/api/plots',{...newBed,plot_code:'BED-B',bounds:[50,8,30,20]},admin)).status,200);
   const beds=(await db.query('SELECT * FROM plots WHERE parent_plot_id=$1 ORDER BY plot_id',[house.plot_id])).rows;
   assert.equal(beds.length,2);assert.ok(beds.every(p=>p.map_slot===null));
-  const plant={plant_id:1,plot_id:house.plot_id,planted_date:'2026-10-19',assigned_staff_id:2};
+  const plant={plant_id:1,plot_id:house.plot_id,planting_stage:'Seedling',planted_date:'2026-10-19',assigned_staff_id:2};
   assert.equal((await request('/api/cycles',plant,admin)).status,400);
   for(const [i,bed] of beds.entries())assert.equal((await request('/api/cycles',{...plant,plot_id:bed.plot_id,plant_id:i+1},admin)).status,200);
   const layout={plot_id:beds[0].plot_id,bounds:[5,5,45,30],revision:0,map_edit:true};
@@ -241,7 +269,7 @@ test('harvest tasks close only their original live crop atomically',async t=>{
   assert.equal((await request('/api/tasks',{...task,plot_id:3},admin)).status,200);
   const stale=await db.get("SELECT * FROM maintenance_tasks WHERE task_type='Harvest' AND plot_id=3");
   await request('/api/harvest',{cycle_id:2,harvest_date:'2026-10-19'},admin);
-  assert.equal((await request('/api/cycles',{plot_id:3,plant_id:1,planted_date:'2026-10-19',assigned_staff_id:2},admin)).status,200);
+  assert.equal((await request('/api/cycles',{plot_id:3,plant_id:1,planting_stage:'Seedling',planted_date:'2026-10-19',assigned_staff_id:2},admin)).status,200);
   assert.equal((await request('/api/complete',{task_id:stale.task_id},staff)).status,409);
   assert.equal((await db.get(`SELECT status FROM maintenance_tasks WHERE task_id=${stale.task_id}`)).status,'Pending');
   assert.ok(await db.get('SELECT cycle_id FROM crop_cycles WHERE current_plot_id=3 AND harvest_date IS NULL'));
@@ -352,7 +380,7 @@ test('admin map layout persists, rejects stale edits, and removes plots without 
   assert.equal((await db.get(`SELECT COUNT(*)::int AS n FROM maintenance_tasks WHERE plot_id=${p.plot_id}`)).n,1);
   assert.equal((await request('/api/tasks',task,admin)).status,404);
   assert.equal((await request('/api/plot-layout',{...removal,revision:1,bounds:[1,2,3,4]},admin)).status,404);
-  assert.equal((await request('/api/cycles',{plot_id:p.plot_id,plant_id:1,planted_date:'2026-10-19',assigned_staff_id:2},admin)).status,404);
+  assert.equal((await request('/api/cycles',{plot_id:p.plot_id,plant_id:1,planting_stage:'Seedling',planted_date:'2026-10-19',assigned_staff_id:2},admin)).status,404);
 });
 
 
