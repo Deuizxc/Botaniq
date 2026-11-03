@@ -48,27 +48,8 @@ test('authenticated state, role boundaries, and static files protect database re
   assert.equal(state.body.users[0].email,undefined);
   assert.ok(state.body.users.every(u=>!('password_hash' in u)));
   assert.equal((await request('/api/plots',{plot_code:'OP-99',zone:'Outdoor'},staff)).status,403);
-  for(const path of ['/data/botaniq.sqlite','/schema.sql','/server.js','/.git/config','/img/testinglang.png','/img/qcu.png']) assert.equal((await request(path)).status,404);
-  for(const path of ['/','/login.html','/edit-plot.html','/staff-dashboard.html','/css/style.css','/js/script.js','/js/garden.js','/img/login_bg.webp','/img/qculogo.webp','/img/Logo.png','/img/landing_botaniq.png','/img/landing_welcomemsg.webp','/img/landingpage_bg.webp','/img/mainpage_bg.webp']) assert.equal((await request(path)).status,200);
-});
-test('static text negotiates gzip and versioned WebP images can be cached',async t=>{
-  const {request}=await fixture(t);
-  for(const [path,file] of [['/','index.html'],['/css/style.css','css/style.css'],['/js/script.js','js/script.js']]) {
-    const compressed=await request(path,undefined,'',{'Accept-Encoding':'gzip'});
-    assert.equal(compressed.headers.get('Content-Encoding'),'gzip');
-    assert.equal(compressed.headers.get('Vary'),'Accept-Encoding');
-    assert.equal(compressed.body,readFileSync(new URL('../'+file,import.meta.url),'utf8'));
-    assert.ok(Number(compressed.headers.get('Content-Length'))<Buffer.byteLength(compressed.body));
-    for(const encoding of ['identity','gzip;q=0, br','gzip;q=0.00']) {
-      const plain=await request(path,undefined,'',{'Accept-Encoding':encoding});
-      assert.equal(plain.headers.get('Content-Encoding'),null);
-      assert.equal(plain.body,compressed.body);
-    }
-  }
-  const image=await request('/img/mainpage_bg.webp?v=1');
-  assert.equal(image.headers.get('Content-Type'),'image/webp');
-  assert.equal(image.headers.get('Content-Encoding'),null);
-  assert.equal(image.headers.get('Cache-Control'),'public, max-age=86400');
+  for(const path of ['/data/botaniq.sqlite','/schema.sql','/server.js','/.git/config']) assert.equal((await request(path)).status,404);
+  for(const path of ['/','/login.html','/edit-plot.html','/staff-dashboard.html','/css/style.css','/js/script.js','/js/garden.js','/img/testinglang.png','/img/qcu.png','/img/login_bg.png','/img/qculogo.png','/img/Logo.png','/img/landing_botaniq.png','/img/landing_welcomemsg.png','/img/landingpage_bg.png','/img/mainpage_bg.png']) assert.equal((await request(path)).status,200);
 });
 test('staff messages stay private to admins, including through state and read endpoints',async t=>{
   const {request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com'),other=await login('andreifurton@gmail.com');
@@ -215,55 +196,13 @@ test('competing transplants cannot double-book a plot',async t=>{
   assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM crop_cycles WHERE current_plot_id=2 AND harvest_date IS NULL')).n,1);
   assert.equal((await db.get("SELECT COUNT(*)::int AS n FROM plots WHERE zone='Nursery' AND occupancy_status='Occupied'")).n,1);
 });
-test('three bad logins do not lock out another account on the same IP',async t=>{
-  const {request,password}=await fixture(t);
-  for(let i=0;i<3;i++) assert.equal((await request('/api/login',{email:'unknown@example.com',password:'incorrect'})).status,401);
-  assert.equal((await request('/api/login',{email:'admin@gmail.com',password})).status,200);
-});
-test('five account failures lock valid sign-ins for 15 minutes',async t=>{
+test('repeated bad logins are rate-limited',async t=>{
   const {request,password,db}=await fixture(t);
-  for(let i=0;i<4;i++) assert.equal((await request('/api/login',{email:' ADMIN@gmail.com ',password:'incorrect'})).status,401);
-  const before=Date.now();
-  assert.equal((await request('/api/login',{email:'admin@gmail.com',password:'incorrect'})).status,429);
-  const account=await db.get("SELECT * FROM login_failures WHERE client_key='email:admin@gmail.com'");
-  assert.equal(account.failures,5);
-  assert.ok(Number(account.expires_at)>=before+15*60*1000);
+  for(let i=0;i<2;i++) assert.equal((await request('/api/login',{email:'unknown@example.com',password:'incorrect'})).status,401);
+  assert.equal((await request('/api/login',{email:'unknown@example.com',password:'incorrect'})).status,429);
   assert.equal((await request('/api/login',{email:'admin@gmail.com',password})).status,429);
   await db.query('UPDATE login_failures SET expires_at=0');
   assert.equal((await request('/api/login',{email:'admin@gmail.com',password})).status,200);
-});
-test('successful login clears the account counter while retaining IP failures',async t=>{
-  const {request,password,db}=await fixture(t);
-  const bad={email:'admin@gmail.com',password:'incorrect'};
-  for(let i=0;i<4;i++)assert.equal((await request('/api/login',bad)).status,401);
-  assert.equal((await request('/api/login',{...bad,password})).status,200);
-  assert.equal((await db.get("SELECT COUNT(*)::int AS n FROM login_failures WHERE client_key='email:admin@gmail.com'")).n,0);
-  for(let i=0;i<4;i++)assert.equal((await request('/api/login',bad)).status,401);
-  assert.equal((await db.get("SELECT failures FROM login_failures WHERE client_key LIKE 'ip:%'")).failures,8);
-  assert.equal((await request('/api/login',{...bad,password})).status,200);
-});
-test('an IP is limited after twenty failures across different accounts',async t=>{
-  const {request,password,db}=await fixture(t);
-  for(let i=0;i<20;i++)assert.equal((await request('/api/login',{email:`unknown${i}@example.com`,password:'incorrect'})).status,i===19?429:401);
-  assert.equal((await request('/api/login',{email:'admin@gmail.com',password})).status,429);
-  await db.query("UPDATE login_failures SET expires_at=0 WHERE client_key LIKE 'ip:%'");
-  assert.equal((await request('/api/login',{email:'admin@gmail.com',password})).status,200);
-});
-test('forwarded IPs are ignored locally and trusted only on Vercel',async t=>{
-  const original=process.env.VERCEL;
-  t.after(()=>{if(original===undefined)delete process.env.VERCEL;else process.env.VERCEL=original;});
-  delete process.env.VERCEL;
-  const {request,db,password}=await fixture(t);
-  for(const ip of ['192.0.2.1','192.0.2.2']) {
-    await request('/api/login',{email:'unknown@example.com',password:'incorrect'},'',{'x-forwarded-for':ip});
-  }
-  assert.deepEqual((await db.query("SELECT client_key,failures FROM login_failures WHERE client_key LIKE 'ip:%'")).rows,[{client_key:'ip:127.0.0.1',failures:2}]);
-  process.env.VERCEL='1';
-  for(let i=0;i<5;i++) {
-    assert.equal((await request('/api/login',{email:'admin@gmail.com',password:'incorrect'},'',{'x-forwarded-for':`192.0.2.${i+1}, 10.0.0.1`})).status,i===4?429:401);
-  }
-  assert.equal((await db.get("SELECT failures FROM login_failures WHERE client_key='ip:192.0.2.1'")).failures,1);
-  assert.equal((await request('/api/login',{email:'admin@gmail.com',password},'',{'x-forwarded-for':'192.0.2.99'})).status,429);
 });
 
 test('garden migration preserves existing plots and creates 27 unique map positions once',async t=>{

@@ -4,7 +4,6 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypt
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
 
 const { Pool } = pg;
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -706,30 +705,24 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           '/css/style.css': ['css/style.css', 'text/css'],
           '/js/script.js': ['js/script.js', 'text/javascript'],
           '/js/garden.js': ['js/garden.js', 'text/javascript'],
-          '/img/qculogo.webp': ['img/qculogo.webp', 'image/webp'],
+          '/img/testinglang.png': ['img/testinglang.png', 'image/png'],
+          '/img/qcu.png': ['img/qcu.png', 'image/png'],
+          '/img/qculogo.png': ['img/qculogo.png', 'image/png'],
           '/img/Logo.png': ['img/Logo.png', 'image/png'],
           '/img/landing_botaniq.png': ['img/landing_botaniq.png', 'image/png'],
-          '/img/landing_welcomemsg.webp': ['img/landing_welcomemsg.webp', 'image/webp'],
-          '/img/landingpage_bg.webp': ['img/landingpage_bg.webp', 'image/webp'],
-          '/img/mainpage_bg.webp': ['img/mainpage_bg.webp', 'image/webp'],
-          '/img/login_bg.webp': ['img/login_bg.webp', 'image/webp'],
+          '/img/landing_welcomemsg.png': ['img/landing_welcomemsg.png', 'image/png'],
+          '/img/landingpage_bg.png': ['img/landingpage_bg.png', 'image/png'],
+          '/img/mainpage_bg.png': ['img/mainpage_bg.png', 'image/png'],
+          '/img/login_bg.png': ['img/login_bg.png', 'image/png'],
           '/img/favicon.png': ['img/favicon.png', 'image/png'] 
         };
         const asset = pages.includes(path) ? ['index.html', 'text/html'] : assets[path];
         if (!asset) fail('Page not found.', 404);
-        const isText = asset[1].startsWith('text/');
-        const acceptsGzip = /(?:^|,)\s*gzip\s*(?:;\s*q=(0(?:\.\d+)?|1(?:\.0+)?))?\s*(?:,|$)/i.exec(req.headers['accept-encoding'] || '');
-        const compressed = isText && acceptsGzip && Number(acceptsGzip[1] ?? 1) > 0;
-        const content = readFileSync(join(ROOT, asset[0]));
-        const payload = compressed ? gzipSync(content) : content;
         res.writeHead(200, {
-          'Content-Type': asset[1] + (isText ? '; charset=utf-8' : ''),
-          'Cache-Control': asset[1] === 'image/webp' ? 'public, max-age=86400' : 'no-cache',
-          'Content-Length': payload.length,
-          ...(isText ? { Vary: 'Accept-Encoding' } : {}),
-          ...(compressed ? { 'Content-Encoding': 'gzip' } : {})
+          'Content-Type': `${asset[1]}; charset=utf-8`,
+          'Cache-Control': 'no-cache'
         });
-        res.end(req.method === 'HEAD' ? '' : payload);
+        res.end(req.method === 'HEAD' ? '' : readFileSync(join(ROOT, asset[0])));
         return;
       }
 
@@ -784,9 +777,8 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         );
 
       if (path === '/api/login' && req.method === 'POST') {
-        const ip = (process.env.VERCEL && req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.socket.remoteAddress;
+        const key = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
         const email = required(b.email, 'Email', 150).toLowerCase();
-        const limits = [[`ip:${ip}`, 20], [`email:${email}`, 5]];
         const password = b.password;
         if (typeof password !== 'string' || !password.length || password.length > 128) {
           fail('Enter a valid password.');
@@ -795,22 +787,16 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           const now = Date.now();
           const expires = now + 15 * 60 * 1000;
           await tx.run('DELETE FROM login_failures WHERE expires_at<=?',now);
-          for (const [key, limit] of limits) {
-            const attempt = await tx.get(`INSERT INTO login_failures(client_key,expires_at) VALUES(?,?)
-              ON CONFLICT(client_key) DO UPDATE SET client_key=EXCLUDED.client_key RETURNING failures`,key,expires);
-            if (attempt.failures >= limit) return { locked: true };
-          }
+          const attempt = await tx.get(`INSERT INTO login_failures(client_key,expires_at) VALUES(?,?)
+            ON CONFLICT(client_key) DO UPDATE SET client_key=EXCLUDED.client_key RETURNING failures`,key,expires);
+          if (attempt.failures >= 3) return { locked: true };
           const account = await tx.get('SELECT * FROM users WHERE email=? AND active=1',email);
           if (!account || !verifyPassword(password,account.password_hash)) {
-            let locked = false;
-            for (const [key, limit] of limits) {
-              const attempt = await tx.get(`UPDATE login_failures SET failures=failures+1,
-                expires_at=CASE WHEN failures+1>=? THEN ? ELSE expires_at END WHERE client_key=? RETURNING failures`,limit,expires,key);
-              if (attempt.failures >= limit) locked = true;
-            }
-            return { locked };
+            await tx.run(`UPDATE login_failures SET failures=failures+1,
+              expires_at=CASE WHEN failures=2 THEN ? ELSE expires_at END WHERE client_key=?`,expires,key);
+            return { locked: attempt.failures === 2 };
           }
-          await tx.run('DELETE FROM login_failures WHERE client_key=?',`email:${email}`);
+          await tx.run('DELETE FROM login_failures WHERE client_key=?',key);
           return { account };
         });
         if (result.locked) fail('Too many sign-in attempts. Try again in 15 minutes.',429);

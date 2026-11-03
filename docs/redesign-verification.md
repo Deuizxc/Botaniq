@@ -1,28 +1,5 @@
 # BotaniQ redesign verification
 
-## November 3 audit fixes
-
-- Separate login failure counters reuse `login_failures`: five failures lock an email for 15 minutes, while an IP allows twenty. Successful sign-in clears the email counter. Forwarded IPs are trusted only on Vercel. No migration or runtime dependency was added.
-- The demo seeding function, password `123`, accounts/emails, API seeding call, and startup log were checked against the original and remain unchanged.
-- CSS now has one root palette and type scale, one rule per selector within each media condition, and no unused classes from the audit list. Dynamic zone and occupancy classes remain. The solid top bar, zero body margin, shorter banners, visible page actions, simpler stat cards, finite badge pulse, and heading/copy fixes are applied.
-- Mobile navigation reserves space for its close button, adds an overlay, supports Escape and keyboard focus containment, and returns focus to the hamburger. Small plot labels are hidden on phones; the 27-plot picker remains available. Plot details lead with the same map number and format planting dates.
-- The artificial startup delay is removed. Non-JSON API failures have a readable message. Crop filtering uses the page's own input. Polling pauses for open task details and restores inspector, task-panel, map, and page scroll after a refresh.
-- HTML/CSS/JS negotiate gzip, including respecting `gzip;q=0`. WebP assets use version queries and a one-day public cache. The duplicate nested project and unused image files are removed; `graphify-out/` and `.serena/` are ignored and no longer tracked.
-
-| Measurement | Before | After |
-| --- | ---: | ---: |
-| Landing image payload, including favicon | 5,079,604 bytes | 392,527 bytes |
-| `css/style.css` lines | 1,916 | 687 |
-| Unique literal hex colors | 242 | 159 |
-
-The image payload is the sum of the served image bodies, excluding HTTP headers: garden photo 314,308 bytes, welcome artwork 55,030 bytes, seal 10,436 bytes, footer logo 10,621 bytes, and favicon 2,132 bytes. Pillow was used once for WebP conversion; the photographs retain their original resolution, while the welcome artwork and seal are resized to 840 and 152 pixels wide.
-
-- `npm test`: **59 passed, 0 failed**, covering the new account/IP lockout cases, reset/expiry and proxy trust, gzip negotiation, API errors, menu focus, planting dates, and refresh preservation. Syntax checks, CSS parsing/duplicate-rule checks, and `git diff --check` pass.
-- Browser checks used an isolated in-memory PGlite database. Landing, login, overview, tasks, plots with an open inspector, crop information, and staff were checked at **375, 768, and 1280 px**. No horizontal page overflow, body-margin frame, or broken image elements were found. Screenshots were reviewed at all three widths.
-- The overview scheduling dialog opens at every tested width. Mobile menu focus, Escape, overlay dismissal, plot selection through the picker, formatted descriptions, and a sticky readable top bar after scrolling were verified. Top-bar text contrast ranges from **5.1:1** for avatar initials to **12.1:1** for white text on forest green; the notification badge pulses three times.
-
-No audit item was skipped. Production deployment, live PostgreSQL, and real touch hardware were not exercised; verification used the local browser and isolated test database.
-
 ## October 27 garden care update
 
 - Four map space types, rectangular greenhouse beds with independent crops and layouts, and removal of the REST landmark and circular map markers.

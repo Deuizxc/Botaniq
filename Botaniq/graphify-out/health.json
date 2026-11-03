@@ -1,0 +1,203 @@
+{
+  "node_count": 193,
+  "unverified_node_count": 0,
+  "raw_edge_count": 481,
+  "non_object_edges": 0,
+  "missing_endpoint_edges": 0,
+  "dangling_endpoint_edges": 5,
+  "external_reference_edges": 14,
+  "self_loop_edges": 1,
+  "valid_candidate_edges": 462,
+  "exact_duplicate_edges": 3,
+  "directed_unique_endpoint_pairs": 433,
+  "directed_same_endpoint_collapsed_edges": 29,
+  "undirected_unique_endpoint_pairs": 432,
+  "undirected_same_endpoint_collapsed_edges": 30,
+  "same_endpoint_group_count": 28,
+  "relation_variant_groups": 24,
+  "source_file_variant_groups": 0,
+  "source_location_variant_groups": 2,
+  "context_variant_groups": 0,
+  "post_build_graph_type": "Graph",
+  "post_build_node_count": 206,
+  "post_build_edge_count": 451,
+  "post_build_error": "",
+  "producer_suppression": {
+    "path": "C:\\Users\\ADMIN\\AppData\\Roaming\\uv\\tools\\graphifyy\\Lib\\site-packages\\graphify\\extract.py",
+    "total_sites": 12,
+    "sites": [
+      {
+        "line": 1813,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 2377,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 2379,
+        "name": "seen_doc_refs",
+        "tuple_arity": 0,
+        "sample": "seen_doc_refs: set[str] = set()"
+      },
+      {
+        "line": 3046,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 3193,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n.get(\"id\") for n in nodes}"
+      },
+      {
+        "line": 4222,
+        "name": "seen_keys",
+        "tuple_arity": 0,
+        "sample": "seen_keys: set[tuple] = set()"
+      },
+      {
+        "line": 4408,
+        "name": "seen_keys",
+        "tuple_arity": 0,
+        "sample": "seen_keys: set[tuple] = set()"
+      },
+      {
+        "line": 7689,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 7797,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 7876,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 8391,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 8392,
+        "name": "seen_edges",
+        "tuple_arity": 4,
+        "sample": "seen_edges: set[tuple[str, str, str, str | None]] = set()"
+      }
+    ],
+    "error": ""
+  },
+  "examples": [
+    {
+      "source": "schema_maintenance_tasks",
+      "target": "schema_users",
+      "edge_count": 3,
+      "relations": [
+        "references"
+      ],
+      "source_files": [
+        "schema.sql"
+      ],
+      "source_locations": [
+        "L49"
+      ],
+      "contexts": [
+        ""
+      ]
+    },
+    {
+      "source": "backend_createhandler",
+      "target": "backend_createhandler_mutate",
+      "edge_count": 2,
+      "relations": [
+        "calls",
+        "contains"
+      ],
+      "source_files": [
+        "backend.js"
+      ],
+      "source_locations": [
+        "L307",
+        "L773"
+      ],
+      "contexts": [
+        "",
+        "call"
+      ]
+    },
+    {
+      "source": "js_script",
+      "target": "js_script_selectedplot",
+      "edge_count": 2,
+      "relations": [
+        "calls",
+        "contains"
+      ],
+      "source_files": [
+        "js/script.js"
+      ],
+      "source_locations": [
+        "L243",
+        "L29"
+      ],
+      "contexts": [
+        "",
+        "call"
+      ]
+    },
+    {
+      "source": "js_script",
+      "target": "js_script_isadmin",
+      "edge_count": 2,
+      "relations": [
+        "calls",
+        "contains"
+      ],
+      "source_files": [
+        "js/script.js"
+      ],
+      "source_locations": [
+        "L30",
+        "L328"
+      ],
+      "contexts": [
+        "",
+        "call"
+      ]
+    },
+    {
+      "source": "js_script",
+      "target": "js_script_api",
+      "edge_count": 2,
+      "relations": [
+        "calls",
+        "contains"
+      ],
+      "source_files": [
+        "js/script.js"
+      ],
+      "source_locations": [
+        "L338",
+        "L45"
+      ],
+      "contexts": [
+        "",
+        "call"
+      ]
+    }
+  ]
+}

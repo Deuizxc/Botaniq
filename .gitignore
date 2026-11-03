@@ -7,5 +7,3 @@ node_modules/
 .env.local
 .env.development
 .env.production
-graphify-out/
-.serena/

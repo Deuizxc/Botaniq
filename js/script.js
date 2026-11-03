@@ -54,9 +54,7 @@ function select(label,name,items) { return `<div class="field"><label for="f-${n
 function textarea(label,name) { return `<div class="field wide"><label for="f-${name}">${label}</label><textarea id="f-${name}" name="${name}" maxlength="500" required></textarea></div>`; }
 async function api(path,body) {
   const response=await fetch(`/api/${path}`,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  let result;
-  try { result=await response.json(); }
-  catch { throw new Error('The server is unavailable. Try again.'); }
+  const result=await response.json();
   if(!response.ok) { if(response.status===401 && path!=='login' && state) { state=null;renderLogin(); } throw new Error(result.error); }
   return result;
 }
@@ -64,35 +62,21 @@ function toast(message) { $('#toast').textContent=message;$('#toast').classList.
 function getView() { return ({'tasks.html':'tasks','plot-info.html':'plots','edit-plot.html':'plots','inventory.html':'inventory','staff.html':'staff','archive.html':'plots','nutrients.html':'tasks'})[location.pathname.split('/').pop()] || 'dashboard'; }
 const href = name => ({dashboard:isAdmin()?'admin-dashboard.html':'staff-dashboard.html',plots:'plot-info.html',tasks:'tasks.html',inventory:'inventory.html',staff:'staff.html',nutrients:'nutrients.html'})[name];
 function renderLanding() {
-  document.body.classList.remove('menu-open');
   document.title='BotaniQ · QCU garden care';
-  $('#app').innerHTML=`<div class="landing"><header class="landing-header"><a class="university" href="/"><img src="/img/qculogo.webp?v=1" alt="Quezon City University seal" width="76" height="76"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><a class="btn" href="login.html">Get started ${icon('arrow')}</a></header><main><section class="landing-intro"><div><h1><img class="welcome-logo" src="/img/landing_welcomemsg.webp?v=1" alt="Welcome to BotaniQ"></h1></div><div class="landing-copy"><p>A shared garden.<br>A little care, every day.</p><p>Keep QCU’s garden growing with clear tasks, planting schedules, and a record of every crop.</p></div></section><figure class="landing-photo"><img src="/img/landingpage_bg.webp?v=1" alt="Vegetable beds and greenhouses at Quezon City University" width="778" height="825"></figure></main><footer class="landing-footer"><a class="brand" href="/"><img src="/img/landing_botaniq.png" alt="BotaniQ"></a><p>Garden Tracker of Quezon City University</p></footer></div>`;
+  $('#app').innerHTML=`<div class="landing"><header class="landing-header"><a class="university" href="/"><img src="/img/qculogo.png" alt="Quezon City University seal" width="76" height="76"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><a class="btn" href="login.html">Get started ${icon('arrow')}</a></header><main><section class="landing-intro"><div><h1><img class="welcome-logo" src="/img/landing_welcomemsg.png" alt="Welcome to BotaniQ"></h1></div><div class="landing-copy"><p>A shared garden.<br>A little care, every day.</p><p>Keep QCU’s garden growing with clear tasks, planting schedules, and a record of every crop.</p></div></section><figure class="landing-photo"><img src="/img/landingpage_bg.png" alt="Vegetable beds and greenhouses at Quezon City University" width="778" height="825"></figure></main><footer class="landing-footer"><a class="brand" href="/"><img src="/img/landing_botaniq.png" alt="BotaniQ"></a><p>Garden Tracker of Quezon City University</p></footer></div>`;
 }
 function renderLogin() {
-  document.body.classList.remove('menu-open');
   $('#modal').close();document.title='BotaniQ · Log in';
-  $('#app').innerHTML=`<main class="login"><section class="login-form"><div class="login-box"><a class="login-back" href="/">← Back</a><h1>Welcome!</h1><p>Log in to check your tasks and manage your plots</p><form id="login-form">${field('Email address','email','email','','required autocomplete="username" placeholder="Your email address"')}${field('Password','password','password','','required autocomplete="current-password" maxlength="128"')}<div class="form-error" role="alert"></div><button class="btn" type="submit">Log in</button></form><p class="login-foot">New here? Approach an admin for a staff account.</p></div></section><section class="login-art" aria-label="The QCU campus garden"><img class="login-background" src="/img/login_bg.webp?v=1" alt="QCU campus gardens and greenhouses" width="778" height="825"><a class="university login-university" href="/"><img src="/img/qculogo.webp?v=1" alt="Quezon City University seal"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><div class="login-brand"><img src="/img/Logo.png" alt="BotaniQ"><p>Assign · Track · Schedule</p></div><div class="login-photo-copy"><p>Good care today.<br>A greener campus tomorrow.</p><span>Quezon City University</span></div></section></main>`;
+  $('#app').innerHTML=`<main class="login"><section class="login-form"><div class="login-box"><a class="login-back" href="/">← Back</a><h1>Welcome!</h1><p>Log in to check your tasks and manage your plots</p><form id="login-form">${field('Email address','email','email','','required autocomplete="username" placeholder="Your email address"')}${field('Password','password','password','','required autocomplete="current-password" maxlength="128"')}<div class="form-error" role="alert"></div><button class="btn" type="submit">Log in</button></form><p class="login-foot">New here? Approach an admin for a staff account.</p></div></section><section class="login-art" aria-label="The QCU campus garden"><img class="login-background" src="/img/login_bg.png" alt="QCU campus gardens and greenhouses" width="778" height="825"><a class="university login-university" href="/"><img src="/img/qculogo.png" alt="Quezon City University seal"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><div class="login-brand"><img src="/img/Logo.png" alt="BotaniQ"><p>Assign · Track · Schedule</p></div><div class="login-photo-copy"><p>Good care today.<br>A greener campus tomorrow.</p><span>Quezon City University</span></div></section></main>`;
   $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,submit=form.querySelector('button');submit.disabled=true;try{await api('login',Object.fromEntries(new FormData(form)));history.replaceState({},'','index.html');await refresh();history.replaceState({},'',href('dashboard'));toast('Welcome back. Your garden is ready.');}catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}});
 }
-function setMenu(open) {
-  $('#sidebar').classList.toggle('open',open);
-  $('.sidebar-overlay').hidden=!open;
-  $('.layout').inert=open;
-  document.body.classList.toggle('menu-open',open);
-  $('.mobile-menu').setAttribute('aria-expanded',String(open));
-  if(open)$('#sidebar .nav a').focus();
-  else if(matchMedia('(max-width: 600px)').matches)$('.mobile-menu').focus();
-}
 function shell() {
-  const menuOpen=$('#sidebar')?.classList.contains('open');
-  document.body.classList.remove('menu-open');
   const names={dashboard:'Overview',plots:'Garden plots',tasks:'Maintenance tasks',inventory:'Crop information',staff:'Staff & access',nutrients:'Nutrient log'};
   const links=[['dashboard','grid'],['tasks','tasks'],['plots','sprout'],['inventory','leaf'],...(isAdmin()?[['staff','users']]:[])];
-  $('#app').innerHTML=`<aside class="sidebar" id="sidebar"><button class="icon-button sidebar-close" data-action="menu" aria-label="Close navigation">${icon('close')}</button><a class="brand" href="${href('dashboard')}"><img class="brand-logo" src="/img/Logo.png" alt="BotaniQ"></a><div class="workspace">Garden workspace</div><nav class="nav" aria-label="Main navigation">${links.map(([name,ic])=>`<a href="${href(name)}" class="${view===name?'active':''}" ${view===name?'aria-current="page"':''} title="${names[name]}">${icon(ic)}<span>${names[name]}</span></a>`).join('')}</nav><div class="sidebar-bottom"><div class="garden-note">${icon('sprout')}<strong>Small steps. Lasting growth.</strong>Every record helps us care for a greener campus.</div><small>CUAI · QUEZON CITY UNIVERSITY</small></div></aside><button class="sidebar-overlay" data-action="menu-close" aria-label="Close navigation" tabindex="-1" hidden></button><div class="layout"><header class="topbar"><button class="icon-button mobile-menu" data-action="menu" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb">Workspace <span>/</span> <strong>${names[view]}</strong></div><div class="top-spacer"></div>${view==='inventory'?'':`<label class="search">${icon('search')}<input id="search" type="search" placeholder="Search" aria-label="Search current page" value="${escape(search)}"></label>`}<button class="icon-button" data-action="notifications" aria-label="Notifications">${icon('bell')}</button><div class="profile-wrap"><button class="profile" data-action="account" aria-label="Account settings" aria-expanded="false" aria-controls="profile-menu"><span class="avatar">${escape(initials(state.user.full_name))}</span><div><strong>${escape(state.user.full_name)}</strong><small>${isAdmin()?'Garden administrator':'Garden staff'}</small></div></button><div id="profile-menu" class="profile-menu" hidden><strong>${escape(state.user.full_name)}</strong><span>${escape(state.user.email)}</span>${button('Edit profile','edit-profile','','text','pencil')}${button('Sign out','logout','','text')}</div></div></header><main class="main" id="main"></main></div>`;
+  $('#app').innerHTML=`<aside class="sidebar" id="sidebar"><button class="icon-button sidebar-close" data-action="menu" aria-label="Close navigation">${icon('close')}</button><a class="brand" href="${href('dashboard')}"><img class="brand-logo" src="/img/Logo.png" alt="BotaniQ"></a><div class="workspace">Garden workspace</div><nav class="nav" aria-label="Main navigation">${links.map(([name,ic])=>`<a href="${href(name)}" class="${view===name?'active':''}" ${view===name?'aria-current="page"':''} title="${names[name]}">${icon(ic)}<span>${names[name]}</span></a>`).join('')}</nav><div class="sidebar-bottom"><div class="garden-note">${icon('sprout')}<strong>Small steps. Lasting growth.</strong>Every record helps us care for a greener campus.</div><small>CUAI · QUEZON CITY UNIVERSITY</small></div></aside><div class="layout"><header class="topbar"><button class="icon-button mobile-menu" data-action="menu" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb">Workspace <span>/</span> <strong>${names[view]}</strong></div><div class="top-spacer"></div><label class="search">${icon('search')}<input id="search" type="search" placeholder="Search" aria-label="Search current page" value="${escape(search)}"></label><button class="icon-button" data-action="notifications" aria-label="Notifications">${icon('bell')}</button><div class="profile-wrap"><button class="profile" data-action="account" aria-label="Account settings" aria-expanded="false" aria-controls="profile-menu"><span class="avatar">${escape(initials(state.user.full_name))}</span><div><strong>${escape(state.user.full_name)}</strong><small>${isAdmin()?'Garden administrator':'Garden staff'}</small></div></button><div id="profile-menu" class="profile-menu" hidden><strong>${escape(state.user.full_name)}</strong><span>${escape(state.user.email)}</span>${button('Edit profile','edit-profile','','text','pencil')}${button('Sign out','logout','','text')}</div></div></header><main class="main" id="main"></main></div>`;
   updateBell();
-  $('#search')?.addEventListener('input',event=>{search=event.target.value;renderMain();});
+  $('#search').addEventListener('input',event=>{search=event.target.value;renderMain();});
   renderMain();
-  if(menuOpen)$('.mobile-menu').focus();
 }
 function heading(title,description,action='') { return `<div class="page-heading"><div><h1>${title}</h1><p>${description}</p></div><div class="heading-actions">${action}</div></div>`; }
 function panelHead(title,description='',link='') { return `<div class="panel-head"><div><h2>${title}</h2>${description?`<p>${description}</p>`:''}</div>${link}</div>`; }
@@ -105,7 +89,7 @@ function renderMain() {
   if(view==='inventory') content=inventoryPage();
   if(view==='staff') content=isAdmin()?staffPage():empty('Staff management is available to administrators.');
   $('#main').classList.toggle('overview-page',view==='dashboard');
-  $('#main').innerHTML=content+`<footer class="footer"><span>${icon('leaf')}Growing with purpose. Caring for our campus.</span><span>BotaniQ · CUAI Garden Management</span></footer>`;
+  $('#main').innerHTML=content+`<footer class="footer"><span>${icon('leaf')}Growing with purpose. Caring for our campus.</span><span>BotaniQ · CUAI Garden Management &nbsp; / &nbsp; Demo garden</span></footer>`;
   mountGardenMap();
   $('#staff-filter')?.addEventListener('change',event=>{staffFilter=event.target.value;renderMain();});
   $('#crop-search')?.addEventListener('input',event=>{
@@ -121,7 +105,7 @@ function dashboard() {
   const team=state.tasks.filter(t=>t.status==='Pending');
   const tasks=(isAdmin()?team:pending).filter(t=>!calendarDate||t.scheduled_date===calendarDate);
   const stats=overviewPlots(state);
-  return heading(`Welcome, ${escape(state.user.full_name.split(' ')[0])}.`,`${fmt(state.today)} · ${isAdmin()?team.length+' team tasks':pending.length+' of your tasks'} still need care.`,isAdmin()?button('Schedule task','new-task','','','plus'):button('View my tasks','my-tasks','','','tasks'))+
+  return heading(`Welcome, ${escape(isAdmin()?'Admin':state.user.full_name.split(' ')[0])}.`,`${fmt(state.today)} · ${isAdmin()?team.length+' team tasks':pending.length+' of your tasks'} still need care.`,isAdmin()?button('Schedule task','new-task','','','plus'):button('View my tasks','my-tasks','','','tasks'))+
     `<div class="stats care-stats">${stats.map(({label,plots},i)=>`<button class="stat" data-action="stat-plots" data-id="${i}" aria-label="${label}: ${plots.length}. View plots"><span class="stat-top">${label}</span><span class="stat-value">${plots.length}</span><span class="stat-foot">View plots →</span></button>`).join('')}</div><div class="care-grid ${isAdmin()?'admin-care':''}"><section class="panel care-queue">${panelHead(isAdmin()?'Team assignments':'Your tasks',calendarDate?fmt(calendarDate):'Unfinished care, ordered by schedule.',link('View all','tasks'))}${calendarDate?button('Show all dates','calendar-clear','','text small'):''}<div class="task-list">${tasks.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||''])).slice(0,4).map(t=>`<div class="care-row"><div><a href="plot-info.html?id=${t.plot_id}">${escape(t.plot_code)}</a><h3>${escape(t.task_type)}</h3><p>${isAdmin()?escape(t.assigned_staff||'Unassigned')+' · ':''}${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}</p></div><div>${t.scheduled_date<state.today?badge('Overdue','amber'):''}${t.scheduled_date===state.today&&!isAdmin()?button('Complete','complete',t.task_id,'secondary small','check'):t.scheduled_date>state.today?badge('Upcoming','gray'):''}</div></div>`).join('')||empty(calendarDate?'No unfinished tasks on this date.':'All caught up. No unfinished tasks.')}</div>${tasks.length>4?`<p class="queue-more">${tasks.length-4} more tasks in Maintenance tasks.</p>`:''}</section>${isAdmin()?`<aside class="panel team-summary">${panelHead('Garden team','Today’s assignments completed today')}${state.users.filter(u=>u.role==='Staff'&&u.active) .map(u=>{const {total,completed}=dailyProgress(state.tasks,u.user_id,state.today);return `<div class="team-row"><span class="avatar">${escape(initials(u.full_name))}</span><span>${escape(u.full_name)}</span><div class="team-progress"><progress value="${completed}" max="${total||1}" aria-label="${escape(u.full_name)}: ${completed} of ${total} assignments completed today"></progress><small>${total?`${completed} / ${total} completed`:'No tasks today'}</small></div></div>`;}).join('')||empty('No staff accounts yet.')}</aside>`:taskCalendar(pending)}</div>`;
 }
 function taskCalendar(pending) {
@@ -140,7 +124,7 @@ function filterMap() {
 }
 function plotsPage() {
   const house=greenhouse();
-  return heading(house?escape(house.plot_code):'CUAI Garden Atlas',house?'Each bed has its own crop, care tasks and editable layout.':'Explore the garden’s plots, crops and care.',(house?'<a class="btn secondary" href="plot-info.html">Back to garden</a>':'')+(isAdmin()?button(editingMap?'Done editing map':'Edit map','map-edit','','',editingMap?'check':'pencil'):''))+
+  return heading(house?escape(house.plot_code):'CUAI Garden Atlas',house?'Each bed has its own crop, care tasks and editable layout.':'Every plot gets the care it needs.',(house?'<a class="btn secondary" href="plot-info.html">Back to garden</a>':'')+(isAdmin()?button(editingMap?'Done editing map':'Edit map','map-edit','','',editingMap?'check':'pencil'):''))+
     `<div class="toolbar">${filters(['All zones','Greenhouse','Outdoor','Nursery','Open space'],zone,'zone')}<span class="muted"><small>Tap a space. See what’s growing.</small></span></div><div class="atlas-layout ${isAdmin()?'with-tasks':''}">${isAdmin()?`<aside class="panel atlas-tasks">${panelHead('Unfinished tasks','Staff assignments')}${state.tasks.filter(t=>t.status==='Pending'&&match([t.task_type,t.plot_code,t.assigned_staff||''])).map(t=>`<a class="atlas-task" href="tasks.html?task=${t.task_id}" data-task-date="${t.scheduled_date}"><strong>${escape(t.task_type)}</strong><span>${escape(t.plot_code)} · ${escape(t.assigned_staff||'Unassigned')}</span><small>${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}${t.scheduled_date<state.today?' · Overdue':''}</small></a>`).join('')||empty('No unfinished tasks.')}</aside>`:''}${gardenMap()}</div>`;
 }
 function gardenMap(compact=false) {
@@ -148,7 +132,7 @@ function gardenMap(compact=false) {
   const height=(house?100:editingMap?mapExtent:Math.max(100,...plots.map(p=>{const [,y,,h]=plotBounds(p);return y+h+5;})))*7;
   return `<section class="garden-map ${compact?'compact':''} ${editingMap?'editing-map':''} ${mapPlacing?'placing-plot':''}" aria-label="Interactive garden map">
     ${editingMap?mapEditorToolbar():''}
-    <div class="map-caption"><span class="eyebrow">CUAI / Garden atlas</span><label class="map-picker"><span class="sr-only">Choose a plot</span><select id="map-picker"><option value="">Choose a plot…</option>${[...plots].sort((a,b)=>a.map_slot-b.map_slot).map(p=>`<option value="${p.plot_id}" ${selectedPlot()?.plot_id===p.plot_id?'selected':''}>${p.map_slot?`${p.map_slot} · `:''}${escape(p.plot_code)}</option>`).join('')}</select></label></div>
+    <div class="map-caption"><span class="eyebrow">CUAI / Garden atlas</span><label class="map-picker"><span class="sr-only">Choose a plot</span><select id="map-picker"><option value="">Choose a plot…</option>${[...plots].sort((a,b)=>a.map_slot-b.map_slot).map(p=>`<option value="${p.plot_id}" ${selectedPlot()?.plot_id===p.plot_id?'selected':''}>${p.map_slot?`${p.map_slot} · `:''}${escape(p.plot_code)}</option>`).join('')}</select></label><span>${icon('sprout')} Tap a space. See what’s growing.</span></div>
     <div class="map-viewport"><svg class="map-svg" viewBox="0 0 1000 ${height}" aria-label="Garden plots. Drag or use arrow keys to move the map." role="group" tabindex="0">
       <defs><pattern id="map-grain" width="24" height="24" patternUnits="userSpaceOnUse"><rect x="2" y="2" width="2" height="2" fill="#a8b99b" opacity=".3"/></pattern>
       <pattern id="bed-rows" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 6h12" stroke="#fff" opacity=".15" stroke-width="2"/></pattern></defs>
@@ -174,7 +158,7 @@ function mapPlotMarkup(p) {
           const occupancy=isGreenhouse(p)?(beds.some(b=>b.occupancy_status==='Occupied')?'Occupied':'Vacant'):p.occupancy_status;
           const muted=!matchesPlot(p);
           const assigned=assignedPending(state.tasks,state.user.user_id).some(t=>t.plot_id===p.plot_id||beds.some(b=>b.plot_id===t.plot_id));
-          return `<g class="map-plot ${p.zone.toLowerCase().replace(' ','-')} ${occupancy.toLowerCase()} ${h<14?'small-plot':''} ${muted?'dimmed':''}" data-action="map-plot" data-id="${p.plot_id}" role="button" tabindex="0" aria-pressed="${editingMap&&mapEditId===p.plot_id}" aria-label="Plot ${slot}, ${escape(p.plot_code)}, ${escape(caption)}">
+          return `<g class="map-plot ${p.zone.toLowerCase().replace(' ','-')} ${occupancy.toLowerCase()} ${muted?'dimmed':''}" data-action="map-plot" data-id="${p.plot_id}" role="button" tabindex="0" aria-pressed="${editingMap&&mapEditId===p.plot_id}" aria-label="Plot ${slot}, ${escape(p.plot_code)}, ${escape(caption)}">
             <title>${escape(p.plot_code)} · ${escape(caption)} · ${p.zone}</title>
             <rect class="plot-shape" x="${x*10}" y="${y*7}" width="${w*10}" height="${h*7}" rx="3"/>
             <rect class="plot-texture" x="${x*10+4}" y="${y*7+4}" width="${w*10-8}" height="${h*7-8}" rx="5" fill="url(#bed-rows)"/>
@@ -342,7 +326,7 @@ function renderPlotInspector() {
   const c=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date),record=plotOverview(state,p,c);
   if(p.zone==='Open space'){record.crop_name='Open space';if(!state.entries.some(e=>e.plot_id===p.plot_id))record.description='Unplanted space for access, storage or other garden use.';}
   panel.hidden=false;
-  panel.innerHTML=`<div class="inspector-heading"><div><span class="eyebrow">${p.removed_at?'Removed from map':escape(p.zone)} · ${escape(p.plot_code)}</span><h2 id="plot-heading" tabindex="-1">Plot ${p.map_slot||p.plot_id}</h2></div><div class="inspector-buttons">${isAdmin()&&!p.removed_at&&plotTab==='overview'&&!editingPlot?`<button class="icon-button" data-action="plot-edit" aria-label="Edit plot details">${icon('pencil')}</button>`:''}<button class="btn plot-exit" data-action="map-reset" aria-label="Exit plot details">${icon('close')} Exit plot</button></div></div>
+  panel.innerHTML=`<div class="inspector-heading"><div><span class="eyebrow">${p.removed_at?'Removed from map':escape(p.zone)} · Plot ${p.map_slot||p.plot_id}</span><h2 id="plot-heading" tabindex="-1">${escape(p.plot_code)}</h2></div><div class="inspector-buttons">${isAdmin()&&!p.removed_at&&plotTab==='overview'&&!editingPlot?`<button class="icon-button" data-action="plot-edit" aria-label="Edit plot details">${icon('pencil')}</button>`:''}<button class="btn plot-exit" data-action="map-reset" aria-label="Exit plot details">${icon('close')} Exit plot</button></div></div>
     <div class="tabs inspector-tabs" role="tablist" aria-label="Plot information">${['overview','history'].map(tab=>`<button id="tab-${tab}" class="tab ${plotTab===tab?'active':''}" role="tab" aria-selected="${plotTab===tab}" aria-controls="plot-tab-content" tabindex="${plotTab===tab?0:-1}" data-action="plot-tab" data-id="${tab}">${tab==='overview'?'Overview':'History'}</button>`).join('')}</div>
     <div id="plot-tab-content" class="inspector-content" role="tabpanel" aria-labelledby="tab-${plotTab}">
     ${plotTab==='history'?historyPanel(p):editingPlot&&isAdmin()&&!p.removed_at?plotEditor(record):`${plotFacts(record,p)}<div class="plot-state">${statusBadge(p.occupancy_status)}<span>Times in Asia/Manila</span></div>`}</div>`;
@@ -419,21 +403,13 @@ function bindPlotEditor(p,record) {
   });
 }
 document.addEventListener('keydown',event=>{
-  if($('#sidebar')?.classList.contains('open')) {
-    if(event.key==='Escape'){event.preventDefault();setMenu(false);return;}
-    if(event.key==='Tab') {
-      const links=$('#sidebar').querySelectorAll('button,a[href]'),first=links[0],last=links[links.length-1];
-      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
-      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
-    }
-  }
   if(event.key==='Escape'&&$('#profile-menu')&&!$('#profile-menu').hidden){$('#profile-menu').hidden=true;$('.profile').setAttribute('aria-expanded','false');$('.profile').focus();}
   if(event.target.closest('.map-plot')&&['Enter',' '].includes(event.key)){event.preventDefault();event.target.closest('.map-plot').dispatchEvent(new MouseEvent('click',{bubbles:true}));}
   if(event.key==='Escape'&&!$('#modal').open&&editingMap&&mapPlacing){mapPlacing=false;renderMain();return;}
   if(event.key==='Escape'&&!$('#modal').open&&selectedPlot()){event.preventDefault();closeMapPlot();}
   if(event.target.matches('[data-action="plot-tab"]')&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();plotTab=plotTab==='overview'?'history':'overview';editingPlot=false;renderPlotInspector();$('#tab-'+plotTab).focus();}
 });
-window.addEventListener('resize',()=>{if(!matchMedia('(max-width: 600px)').matches&&$('#sidebar')?.classList.contains('open'))setMenu(false);if(view==='plots')zoomMap(selectedPlot());});
+window.addEventListener('resize',()=>{if(view==='plots')zoomMap(selectedPlot());});
 
 function taskDetails(t) {
   const own=t.assigned_staff_id===state.user.user_id,pending=t.status==='Pending',due=t.scheduled_date===state.today;
@@ -446,8 +422,8 @@ function tasksPage() {
   const quietToday=!isAdmin()&&taskFilter==='Open'&&!search&&!scoped.some(t=>t.status==='Pending'&&t.scheduled_date<=state.today);
   return heading('Maintenance tasks','Dated care, with overdue tasks shown first.',isAdmin()?button('Schedule task','new-task','','','plus'):'')+`<section class="task-board"><div class="task-toolbar">${filters(['Open','Overdue','Done'],taskFilter,'task-filter')}${!isAdmin()?'My tasks':`<label class="task-scope">Show<select id="staff-filter"><option value="all">All team assignments</option>${options(state.users.filter(u=>u.role==='Staff'),'user_id','full_name',staffFilter)}</select></label>`}</div>${quietToday?empty('Nothing due today. Your garden is in good hands.'):''}${tasks.map(taskDetails).join('')||(!quietToday?empty('No '+taskFilter.toLowerCase()+' tasks match this view.'):'')}</section>${isAdmin()?'<button class="task-fab" data-action="new-task" aria-label="Schedule a task">'+icon('plus')+'</button>':''}`;
 }
-function inventoryPage() { const plants=state.plants.filter(p=>`${p.crop_name} ${p.variety||''} ${p.notes||''}`.toLowerCase().includes(cropSearch.trim().toLowerCase()));return heading('Crop Information','Browse crop varieties and growing notes.',isAdmin()?button('Add crop','new-plant','','','plus'):'')+`<div class="catalog-filter"><label for="crop-search">Find a crop or variety</label><input id="crop-search" type="search" value="${escape(cropSearch)}" placeholder="Search crops, varieties or notes" autocomplete="off"></div><section class="panel" id="crop-results" aria-live="polite">${panelHead('Garden catalog',`${state.plants.length} crop varieties in the garden catalog`)}${plants.length?`<div class="table-wrap"><table class="crop-table"><thead><tr><th>Crop</th><th>Variety</th><th class="numeric">Live cycles</th><th>Growing notes</th><th></th></tr></thead><tbody>${plants.map(p=>`<tr><td><strong>${escape(p.crop_name)}</strong></td><td data-label="Variety">${escape(p.variety||'—')}</td><td data-label="Live cycles" class="numeric">${state.cycles.filter(c=>c.plant_id===p.plant_id&&!c.harvest_date).length}</td><td data-label="Growing notes">${escape(p.notes||'—')}</td><td>${isAdmin()?button('Plant crop','plant-crop',p.plant_id,'secondary small'):''}</td></tr>`).join('')}</tbody></table></div>`:empty('No crops match your search.')}</section>`; }
-function staffPage() { return heading('Staff and Access','Manage the people who care for the garden.',button('Add account','new-user','','','plus'))+`<div class="account-grid">${state.users.filter(u=>match([u.full_name,u.email,u.role])).map(u=>`<article class="person-card"><span class="avatar">${escape(initials(u.full_name))}</span><h3>${escape(u.full_name)}</h3><p>${escape(u.email)}<br>${u.role} · ${state.tasks.filter(t=>t.assigned_staff_id===u.user_id&&t.status==='Pending').length} pending tasks</p><div class="person-bottom">${badge(u.active?'Active':'Inactive',u.active?'':'gray')}${u.user_id!==state.user.user_id?button('Remove account','remove-user',u.user_id,'text danger'):'<small class="muted">Your account</small>'}</div></article>`).join('')}</div>`; }
+function inventoryPage() { const plants=state.plants.filter(p=>match([p.crop_name,p.variety,p.notes])&&`${p.crop_name} ${p.variety||''} ${p.notes||''}`.toLowerCase().includes(cropSearch.trim().toLowerCase()));return heading('Crop Information','Every plot gets the care it needs.',isAdmin()?button('Add crop','new-plant','','','plus'):'')+`<div class="catalog-filter"><label for="crop-search">Find a crop or variety</label><input id="crop-search" type="search" value="${escape(cropSearch)}" placeholder="Search crops, varieties or notes" autocomplete="off"></div><section class="panel" id="crop-results" aria-live="polite">${panelHead('Crop information',`${state.plants.length} crop varieties in the garden catalog`)}${plants.length?`<div class="table-wrap"><table class="crop-table"><thead><tr><th>Crop</th><th>Variety</th><th class="numeric">Live cycles</th><th>Growing notes</th><th></th></tr></thead><tbody>${plants.map(p=>`<tr><td><strong>${escape(p.crop_name)}</strong></td><td data-label="Variety">${escape(p.variety||'—')}</td><td data-label="Live cycles" class="numeric">${state.cycles.filter(c=>c.plant_id===p.plant_id&&!c.harvest_date).length}</td><td data-label="Growing notes">${escape(p.notes||'—')}</td><td>${isAdmin()?button('Plant crop','plant-crop',p.plant_id,'secondary small'):''}</td></tr>`).join('')}</tbody></table></div>`:empty('No crops match your search.')}</section>`; }
+function staffPage() { return heading('Staff and Access','Every plot gets the care it needs.',button('Add account','new-user','','','plus'))+`<div class="account-grid">${state.users.filter(u=>match([u.full_name,u.email,u.role])).map(u=>`<article class="person-card"><span class="avatar">${escape(initials(u.full_name))}</span><h3>${escape(u.full_name)}</h3><p>${escape(u.email)}<br>${u.role} · ${state.tasks.filter(t=>t.assigned_staff_id===u.user_id&&t.status==='Pending').length} pending tasks</p><div class="person-bottom">${badge(u.active?'Active':'Inactive',u.active?'':'gray')}${u.user_id!==state.user.user_id?button('Remove account','remove-user',u.user_id,'text danger'):'<small class="muted">Your account</small>'}</div></article>`).join('')}</div>`; }
 function modal(title,description,fields,endpoint,extra={},label='Save record') {
   const dialog=$('#modal');
   dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">${title}</h2><button class="icon-button" data-action="close" aria-label="Close dialog">${icon('close')}</button></div><div class="modal-body"><p>${description}</p><form id="record-form">${fields}<div class="form-error" role="alert"></div><div class="modal-actions"><button type="button" class="btn secondary" data-action="close">Cancel</button><button class="btn" type="submit">${label}</button></div></form></div>`;
@@ -537,7 +513,7 @@ document.addEventListener('click',async event=>{
   const {action,id}=target.dataset;
   try {
     if(action==='close'){$('#modal').close();return;}
-    if(action==='menu'||action==='menu-close'){setMenu(action==='menu'&&!$('#sidebar').classList.contains('open'));return;}
+    if(action==='menu'){$('#sidebar').classList.toggle('open');$('.mobile-menu').setAttribute('aria-expanded',$('#sidebar').classList.contains('open'));if(!$('#sidebar').classList.contains('open'))$('.mobile-menu').focus();return;}
     if(mapSaving&&['map-edit','new-plot','remove-plot','map-place-cancel'].includes(action))return;
     if(action==='map-edit') {
       if(!isAdmin()||mapSaving)return;
@@ -577,17 +553,18 @@ document.addEventListener('click',async event=>{
 window.addEventListener('popstate',()=>{editingMap=false;mapPlacing=false;mapEditId=null;if(['/','/index.html'].includes(location.pathname)){renderLanding();}else if(state){view=getView();search='';shell();}else renderLogin();});
 const landingRoute=['/','/index.html'].includes(location.pathname);
 try {
-  state=await api('state').catch(error=>{if(error.message!=='Please sign in to continue.')toast(error.message);return null;});
+  const [loaded]=await Promise.all([api('state').catch(error=>{if(error.message!=='Please sign in to continue.')toast(error.message);return null;}),new Promise(resolve=>setTimeout(resolve,landingRoute&&!matchMedia('(prefers-reduced-motion: reduce)').matches?1000:0))]);
+  state=loaded;
   if(landingRoute)renderLanding();else if(state){view=getView();shell();}else renderLogin();
 } catch(error){renderLogin();toast(error.message);}
 
 let polling=false;
 setInterval(async()=>{
-  if(!state||document.hidden||$('#modal').open||editingMap||editingPlot||polling||!$('#main')||$('.task-item[open]'))return;
+  if(!state||document.hidden||$('#modal').open||editingMap||editingPlot||polling||!$('#main'))return;
   polling=true;
   try {
     const current=state;
-    const next=await api('state');if(state!==current||next.user.user_id!==current.user.user_id||editingMap||editingPlot||$('.task-item[open]'))return;
+    const next=await api('state');if(state!==current||next.user.user_id!==current.user.user_id||editingMap||editingPlot)return;
     const previous=new Set(notificationKeys(state));
     const incoming=notificationKeys(next).filter(key=>!previous.has(key));
     const changed=state.today!==next.today||JSON.stringify(state.tasks)!==JSON.stringify(next.tasks)||JSON.stringify(state.plots)!==JSON.stringify(next.plots)||JSON.stringify(state.cycles)!==JSON.stringify(next.cycles);
@@ -596,13 +573,7 @@ setInterval(async()=>{
       toast(isAdmin()?`${incoming.length} new garden notification${incoming.length===1?'':'s'}. Open the bell to review.`:'Your garden work has an update. Check your tasks and coverage requests.');
     }
     updateBell();
-    if(changed&&['dashboard','tasks','plots'].includes(view)&&!document.activeElement?.matches('input,select,textarea')) {
-      const panels=['.inspector-content','.atlas-tasks','.map-viewport'].map(selector=>[selector,$(selector)?.scrollTop||0,$(selector)?.scrollLeft||0]);
-      const scroll=window.scrollY;
-      renderMain();
-      for(const [selector,top,left] of panels){const panel=$(selector);if(panel){panel.scrollTop=top;panel.scrollLeft=left;}}
-      window.scrollTo(0,scroll);
-    }
+    if(changed&&['dashboard','tasks','plots'].includes(view)&&!document.activeElement?.matches('input,select,textarea'))renderMain();
   } catch(error) {if(state)toast('Could not refresh notifications. Check your connection.');}
   finally {polling=false;}
 },30000);

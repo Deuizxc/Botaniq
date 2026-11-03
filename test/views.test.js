@@ -45,54 +45,7 @@ test('crop search matches varieties and clearing it restores the full catalog fo
     assert.match(render("cropSearch=''; inventoryPage()").split('id="crop-results"')[1],/Beefsteak/);
     assert.match(render("cropSearch='unknown'; inventoryPage()"),/No crops match/);
     assert.doesNotMatch(render('inventoryPage()'),/datalist|list="crop-options"/);
-    assert.match(render("search='unrelated top-bar query';cropSearch='Cherry';inventoryPage()"),/Cherry/);
   }
-});
-
-test('non-JSON API failures give a readable server error',async()=>{
-  const render=page();
-  await assert.rejects(render("fetch=async()=>({ok:false,status:503,json:async()=>{throw new SyntaxError('Unexpected token <')}});api('state')"),/The server is unavailable\. Try again\./);
-  await assert.rejects(render("fetch=async()=>({ok:false,status:400,json:async()=>({error:'Choose a plot.'})});api('plots')"),/Choose a plot\./);
-});
-
-test('mobile navigation moves focus to the first link and restores the menu button',()=>{
-  const render=page('Admin');
-  const result=render(`let focused;
-    const classes={toggle(name,value){this[name]=value}};
-    const elements={
-      '#sidebar':{classList:classes},'.sidebar-overlay':{},'.layout':{},
-      '.mobile-menu':{setAttribute(name,value){this[name]=value},focus(){focused='menu'}},
-      '#sidebar .nav a':{focus(){focused='first link'}}
-    };
-    document.body={classList:{toggle(name,value){this[name]=value}}};
-    document.querySelector=selector=>elements[selector];matchMedia=()=>({matches:true});
-    setMenu(true);
-    const opened={focus:focused,inert:elements['.layout'].inert,overlay:elements['.sidebar-overlay'].hidden,expanded:elements['.mobile-menu']['aria-expanded']};
-    setMenu(false);
-    JSON.stringify({opened,closed:{focus:focused,inert:elements['.layout'].inert,overlay:elements['.sidebar-overlay'].hidden,expanded:elements['.mobile-menu']['aria-expanded']}})`);
-  assert.deepEqual(JSON.parse(result),{opened:{focus:'first link',inert:true,overlay:false,expanded:'true'},closed:{focus:'menu',inert:false,overlay:true,expanded:'false'}});
-});
-
-test('background refresh pauses for open task details and preserves panel scroll',async()=>{
-  const render=page('Admin');
-  const polling=readFileSync(new URL('../js/script.js',import.meta.url),'utf8').split('let polling=false;')[1];
-  render(`let tick,requests=0,renders=0,taskOpen=true;
-    const inspector={scrollTop:180,scrollLeft:0},atlas={scrollTop:90,scrollLeft:0};
-    const elements={'#modal':{open:false},'#main':{},'.inspector-content':inspector,'.atlas-tasks':atlas};
-    document.querySelector=selector=>selector==='.task-item[open]'?(taskOpen?{}:null):elements[selector];
-    document.activeElement={matches:()=>false};
-    window.scrollY=350;window.scrollTo=(x,y)=>{window.scrollY=y};
-    view='plots';api=async()=>{requests++;return {...state,plots:[{plot_id:9}]}};
-    updateBell=()=>{};renderMain=()=>{renders++;inspector.scrollTop=0;atlas.scrollTop=0;window.scrollY=0};
-    setInterval=callback=>{tick=callback};`);
-  render('let polling=false;'+polling);
-  await render('tick()');
-  assert.equal(render('requests'),0);
-  await render('taskOpen=false;tick()');
-  assert.equal(render('renders'),1);
-  assert.equal(render('inspector.scrollTop'),180);
-  assert.equal(render('atlas.scrollTop'),90);
-  assert.equal(render('window.scrollY'),350);
 });
 
 test('default task list shows overdue work without date groups for both roles',()=>{
@@ -166,9 +119,6 @@ test('map editing and removal controls are separate from plot details and staff 
   assert.match(edit,/Done editing map/);assert.match(edit,/map-edit-toolbar/);assert.match(edit,/data-action="new-plot"/);
   assert.equal((edit.match(/class="plot-handle/g)||[]).length,4);
   assert.match(edit,/x="100" y="140" width="150" height="70"/);
-  assert.match(edit,/map-plot[^\"]*small-plot/);
-  assert.match(normal,/id="map-picker"/);
-  assert.equal((normal.match(/Tap a space/g)||[]).length,1);
   assert.doesNotMatch(page('Staff')('plotsPage()'),/data-action="map-edit"|data-action="new-plot"|data-action="remove-plot"/);
 });
 
