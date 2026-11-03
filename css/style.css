@@ -1890,3 +1890,27 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
   to {box-shadow:0 0 0 7px rgba(163,55,37,0)}
 }
 @media (prefers-reduced-motion:reduce) { .notification-count {animation:none} }
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  dialog[open],
+  .history-entry[open] > .history-entry-body {
+    animation: view-in 140ms ease-out;
+  }
+
+  dialog[open]::backdrop {
+    animation: backdrop-in 120ms ease-out;
+  }
+
+  .btn:active {
+    transition-duration: 60ms;
+  }
+
+  .landing-photo > img {
+    animation-duration: 320ms;
+  }
+}
