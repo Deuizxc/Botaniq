@@ -90,7 +90,7 @@ export function plotOverview(state, plot, cycle, until = '9999-12-31') {
     cycle_id: cycle?.cycle_id ?? null,
     crop_name: cycle?.crop_name || 'Ready for a new chapter',
     description: entry?.description || (cycle
-      ? `${cycle.crop_name}${cycle.variety ? ` (${cycle.variety})` : ''} ${cycle.harvest_date ? 'grew' : 'is growing'} in ${plot.plot_code}. Planted ${cycle.planted_date}${cycle.assigned_staff ? ` and cared for by ${cycle.assigned_staff}` : ''}.`
+      ? `${cycle.crop_name}${cycle.variety ? ` (${cycle.variety})` : ''} ${cycle.harvest_date ? 'grew' : 'is growing'} in ${plot.plot_code}. Planted ${new Date(`${cycle.planted_date}T00:00:00Z`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'})}${cycle.assigned_staff ? ` and cared for by ${cycle.assigned_staff}` : ''}.`
       : `${plot.plot_code} is resting between crops, ready for the next planting.`),
     watered_at: newerWatering ? watering.completed_at : entry ? entry.watered_at : watering?.completed_at || null,
     harvested_at: newerHarvest ? harvest.harvest_date : entry ? entry.harvested_at : harvest?.harvest_date || null,

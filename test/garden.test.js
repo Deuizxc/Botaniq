@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mapPosition, plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, calendarMonth, notificationKeys } from '../js/garden.js';
 
+test('plot descriptions format planting dates for readers',()=>{
+  const record=plotOverview({tasks:[],nutrients:[],cycles:[]},{plot_id:24,plot_code:'NR-01'},
+    {cycle_id:1,current_plot_id:24,crop_name:'Tomato',planted_date:'2026-10-16'});
+  assert.match(record.description,/Planted Oct 16, 2026/);
+  assert.doesNotMatch(record.description,/2026-10-16/);
+});
+
 const plot={plot_id:1,plot_code:'GH-01'};
 const cycle={cycle_id:1,current_plot_id:1,origin_plot_id:1,crop_name:'Tomato',planted_date:'2026-01-01',harvest_date:'2026-02-01'};
 const state={

@@ -1,9 +1,0 @@
-data/
-*.log
-node_modules/
-.env
-.vercel
-.taste-skill/
-.env.local
-.env.development
-.env.production
