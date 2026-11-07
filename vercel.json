@@ -11,6 +11,7 @@
     { "source": "/plot-info.html", "destination": "/index.html" },
     { "source": "/edit-plot.html", "destination": "/index.html" },
     { "source": "/tasks.html", "destination": "/index.html" },
+    { "source": "/reports.html", "destination": "/index.html" },
     { "source": "/inventory.html", "destination": "/index.html" },
     { "source": "/staff.html", "destination": "/index.html" },
     { "source": "/archive.html", "destination": "/index.html" },

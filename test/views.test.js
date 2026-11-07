@@ -19,7 +19,7 @@ function page(role='Staff') {
 
 test('overdue tasks stay visible without completion or takeover actions in either role',()=>{
   for(const role of ['Staff','Admin']) {
-    const render=page(role),html=render("taskFilter='Overdue'; tasksPage()");
+    const render=page(role),html=render("taskFilter='Missed'; tasksPage()");
     assert.match(html,/GH-01/);
     assert.doesNotMatch(html,/class="task-group"|data-action="complete"|data-action="takeover"|>Pending</);
     assert.doesNotMatch(render('dashboard()'),/data-action="complete"|>View notifications</);
@@ -30,7 +30,7 @@ test('overdue tasks stay visible without completion or takeover actions in eithe
 
 test('admin can filter all assignments and read escaped weather observations',()=>{
   const render=page('Admin');
-  assert.match(render("taskFilter='Overdue'; tasksPage()"),/GH-02/);
+  assert.match(render("taskFilter='Missed'; tasksPage()"),/GH-02/);
   const filtered=render("staffFilter='2'; tasksPage()");
   assert.match(filtered,/GH-01/);assert.doesNotMatch(filtered,/GH-02/);
   const detail=render("state.adjustments=[{task_id:1,action:'Skip',full_name:'Garden Staff',reason:'Rain <today>',previous_schedule:'2026-10-22 08:00'}];taskDetails(state.tasks[0])");
@@ -160,4 +160,11 @@ test('photo picker rejects unsupported files and oversized originals before deco
   const render=page('Admin');
   await assert.rejects(render("preparePlotPhoto({type:'image/svg+xml',size:100})"),/Choose a JPG/);
   await assert.rejects(render("preparePlotPhoto({type:'image/jpeg',size:11*1024*1024})"),/up to 10 MB/);
+});
+
+test('reports list each staff member for admins and stay closed to staff',()=>{
+  const html=page('Admin')('reportsPage()');
+  assert.match(html,/Weekly task report/);assert.match(html,/Garden Staff/);assert.match(html,/Other Staff/);assert.match(html,/data-action="report-print"/);
+  assert.match(page('Admin')("reportKind='Monthly';reportsPage()"),/Monthly task report/);
+  assert.doesNotMatch(page('Staff')('shell.toString().includes("isAdmin()?[[")?"":"reports"'),/reports/);
 });

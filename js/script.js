@@ -1,4 +1,4 @@
-import { plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, isGreenhouse, isGrowingPlot, calendarMonth, notificationKeys } from './garden.js';
+import { plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, isGreenhouse, isGrowingPlot, calendarMonth, notificationKeys, needsCover, isMissed, taskSummary, reportPeriod, reportStatus, staffReport, plotOccupancy, growthStage, liveCrop, taskWarnings } from './garden.js';
 const $ = selector => document.querySelector(selector);
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const paths = {
@@ -20,12 +20,16 @@ const paths = {
   close:'M6 6l12 12 M6 18 18 6',
   menu:'M3 6h18 M3 12h18 M3 18h18',
   lock:'M5 10h14v12H5z M8 10V6a4 4 0 0 1 8 0v4',
+  printer:'M6 9V3h12v6 M6 18H3v-8h18v8h-3 M6 14h12v7H6z',
+  report:'M6 2h9l4 4v16H6z M14 2v5h5 M9 12h7 M9 16h7',
   sun:'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1 1 M18 18l1 1 M5 19l1-1 M18 6l1-1'
 };
 const icon = name => `<svg aria-hidden="true" viewBox="0 0 24 24"><path d="${paths[name] || paths.leaf}"/></svg>`;
 let state, view, search = '', zone = 'All zones', taskFilter = 'Open', toastTimer;
 let staffFilter = 'all', cropSearch = '', calendarOffset = 0, calendarDate = '', mapZoom = 1;
 let mapPan = {x:0,y:0};
+let reportKind = 'Weekly', reportOffset = 0, reportStaff = 'all';
+const pageNames = {dashboard:'Overview',plots:'Garden plots',tasks:'Maintenance tasks',reports:'Task reports',inventory:'Crop information',staff:'Staff & access',nutrients:'Nutrient log'};
 let editingMap=false, mapPlacing=false, mapEditId=null, mapSaving=false, mapExtent=100;
 const activePlots=()=>state.plots.filter(p=>!p.removed_at);
 let plotTab = 'overview', editingPlot = false, historyQuery = '', historyFertilizer = 'all', historyFrom = '', historyTo = '';
@@ -42,7 +46,7 @@ const initials = name => name.split(' ').slice(0,2).map(x => x[0]).join('');
 const fmt = value => value ? new Date(`${value.slice(0,10)}T00:00:00Z`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'}) : '—';
 const clock = value => { const [hour,minute] = value.split(':'); return `${Number(hour)%12 || 12}:${minute} ${Number(hour)>=12?'PM':'AM'}`; };
 const badge = (label, color = '') => `<span class="badge ${color}">${escape(label)}</span>`;
-const statusBadge = status => badge(status,({Vacant:'gray',Harvested:'amber',Pending:'amber',Skipped:'gray',Completed:'blue'})[status]||'');
+const statusBadge = status => badge(status,({Vacant:'gray',Harvested:'amber',Pending:'amber',Missed:'amber',Skipped:'gray',Completed:'blue'})[status]||'');
 const match = values => values.join(' ').toLowerCase().includes(search.toLowerCase());
 const empty = text => `<div class="empty">${icon('sprout')}${escape(text)}</div>`;
 const button = (label, action, id = '', style = 'secondary', name = '') => `<button class="btn ${style}" data-action="${action}" data-id="${id}">${name?icon(name):''}${label}</button>`;
@@ -59,11 +63,49 @@ async function api(path,body) {
   return result;
 }
 function toast(message) { $('#toast').textContent=message;$('#toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('visible'),4500); }
-function getView() { return ({'tasks.html':'tasks','plot-info.html':'plots','edit-plot.html':'plots','inventory.html':'inventory','staff.html':'staff','archive.html':'plots','nutrients.html':'tasks'})[location.pathname.split('/').pop()] || 'dashboard'; }
-const href = name => ({dashboard:isAdmin()?'admin-dashboard.html':'staff-dashboard.html',plots:'plot-info.html',tasks:'tasks.html',inventory:'inventory.html',staff:'staff.html',nutrients:'nutrients.html'})[name];
+function getView() { return ({'tasks.html':'tasks','reports.html':'reports','plot-info.html':'plots','edit-plot.html':'plots','inventory.html':'inventory','staff.html':'staff','archive.html':'plots','nutrients.html':'tasks'})[location.pathname.split('/').pop()] || 'dashboard'; }
+const href = name => ({dashboard:isAdmin()?'admin-dashboard.html':'staff-dashboard.html',plots:'plot-info.html',tasks:'tasks.html',reports:'reports.html',inventory:'inventory.html',staff:'staff.html',nutrients:'nutrients.html'})[name];
+// Campus beds growing from seedling to full plant, on a loop. Drawn inline so the CSP needs no new sources.
+function gardenScene() {
+  const bed=(x,y,scale,row,column)=>{
+    const plants=[34,98,162,226].map((px,i)=>{
+      const kind=(row+column+i)%3===0?'#scene-fruit':'#scene-leafy';
+      return `<g transform="translate(${px} 22)"><g class="scene-plant d${(row*2+column+i)%6}"><g class="${row===2?'scene-sway':''}"><use href="${kind}"/></g></g></g>`;
+    }).join('');
+    return `<g transform="translate(${x} ${y}) scale(${scale})"><path class="scene-soil" d="M16 0H244L268 30H-8Z"/><rect x="-8" y="30" width="276" height="24" fill="url(#scene-blocks)"/>${plants}</g>`;
+  };
+  const rows=[[150,338,.56,5,212],[20,392,.74,4,276],[-100,456,1,4,372]];
+  const beds=rows.map(([x,y,scale,count,gap],row)=>Array.from({length:count},(_,i)=>bed(x+i*gap,y,scale,row,i)).join('')).join('');
+  const posts=[12,112,212,312,412,500].map(x=>`<rect x="${x}" y="196" width="13" height="124" fill="#d8b64c"/>`).join('');
+  return `<svg class="garden-scene" viewBox="0 0 1440 540" preserveAspectRatio="xMidYMax slice" role="img" aria-label="Illustration of the QCU garden: raised vegetable beds grow from seedlings into full plants beside a greenhouse and the campus building.">
+    <defs>
+      <linearGradient id="scene-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f6f1"/><stop offset=".6" stop-color="#d6e4c4"/></linearGradient>
+      <linearGradient id="scene-dusk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#efb46a" stop-opacity="0"/><stop offset=".7" stop-color="#efb46a"/></linearGradient>
+      <pattern id="scene-windows" width="30" height="34" patternUnits="userSpaceOnUse"><rect x="5" y="7" width="20" height="20" fill="#7f9aa0"/><path d="M15 7v20" stroke="#e7cd7c" stroke-width="2"/></pattern>
+      <pattern id="scene-mesh" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 0h12M0 0v12" stroke="#4d7354" stroke-width="1.4" fill="none"/></pattern>
+      <pattern id="scene-blocks" width="46" height="24" patternUnits="userSpaceOnUse"><rect width="46" height="24" fill="#8d8f77"/><rect x="5" y="6" width="15" height="12" fill="#55584a"/><rect x="26" y="6" width="15" height="12" fill="#55584a"/><path d="M45.5 0v24" stroke="#6d705c"/></pattern>
+      <symbol id="scene-leafy" overflow="visible"><path fill="#4f8a3c" d="M0 0C-20-5-30-24-20-42-8-34-2-16 0 0Z"/><path fill="#5f9f45" d="M0 0C20-5 30-24 20-42 8-34 2-16 0 0Z"/><path fill="#75b552" d="M0 0C-11-14-11-38 0-54 11-38 11-14 0 0Z"/></symbol>
+      <symbol id="scene-fruit" overflow="visible"><path d="M0 0V-58" stroke="#3f6d38" stroke-width="3.5" fill="none"/><path fill="#46803a" d="M0-14C-18-14-30-26-30-38-14-40-2-30 0-14ZM0-30C18-30 28-42 28-52 12-54 2-44 0-30Z"/><path fill="#63a347" d="M0-46C-10-48-16-56-15-66-5-64 0-56 0-46Z"/><g class="scene-ripe"><circle cx="-14" cy="-20" r="6.5" fill="#c9472f"/><circle cx="13" cy="-36" r="6" fill="#d4562f"/></g></symbol>
+    </defs>
+    <rect width="1440" height="540" fill="url(#scene-sky)"/>
+    <g class="scene-sun"><circle cx="720" cy="44" r="40" fill="#f6d365"/></g>
+    <rect class="scene-dusk" width="1440" height="320" fill="url(#scene-dusk)"/>
+    <g fill="#fbfcf7"><path class="scene-cloud" d="M120 118c6-30 52-36 66-12 22-12 54 0 52 22H98c-10 0-6-12 22-10Z"/><path class="scene-cloud slow" d="M880 72c5-22 40-28 52-8 17-8 42 0 40 16H850c-8 0-5-9 30-8Z"/></g>
+    <path fill="#7da36a" d="M0 318V214c60-40 120-22 170-10 40-44 118-40 170-6 56-36 120-28 180 2 70-30 170-34 240-6 90-40 200-42 290-8 80-26 180-26 250 4 60-20 100-14 140 8v122Z"/>
+    <g><rect x="594" y="92" width="320" height="226" fill="#e7c766"/><rect x="594" y="92" width="320" height="226" fill="url(#scene-windows)"/><path d="M594 160h320M594 228h320" stroke="#c2a549" stroke-width="5"/><path d="M660 92v226M750 92v226M840 92v226" stroke="#b9bdb1" stroke-width="14"/><rect x="584" y="82" width="340" height="12" fill="#a9ad9f"/></g>
+    <rect x="0" y="206" width="510" height="112" fill="url(#scene-mesh)"/>${posts}<rect x="0" y="204" width="510" height="5" fill="#b89a3f"/>
+    <g><path d="M520 318v-34c0-56 150-56 150 0v34Z" fill="#eaf2e6" opacity=".78"/><path d="M520 284c0-56 150-56 150 0M595 244v74M556 254v64M634 254v64" stroke="#92a693" stroke-width="3" fill="none"/></g>
+    <g><path d="M946 318V206c0-112 400-112 400 0v112Z" fill="#edf3ea" opacity=".9"/><path d="M946 206h400M1012 136v182M1080 122v196M1148 118v200M1216 122v196M1284 136v182" stroke="#a5b6a4" stroke-width="3" fill="none"/><path d="M946 318V206c0-112 400-112 400 0v112" stroke="#7f957f" stroke-width="5" fill="none"/></g>
+    <rect y="316" width="1440" height="224" fill="#97b878"/>
+    ${beds}
+    <g class="scene-water"><path d="M1098 468c18-70 66-96 124-78"/><path d="M1098 468c-2-74 42-110 96-112"/><path d="M1098 468c-32-64-84-76-138-52"/><path d="M1098 468c-22-74-66-100-120-92"/></g>
+    <rect x="1093" y="466" width="10" height="56" fill="#55584a"/>
+    <g class="scene-butterfly"><g class="scene-wings"><path fill="#f2b84b" d="M0 0C-12-14-20-8-16 2-20 10-8 12 0 0Z"/><path fill="#e9a23b" d="M0 0C12-14 20-8 16 2 20 10 8 12 0 0Z"/></g></g>
+  </svg>`;
+}
 function renderLanding() {
   document.title='BotaniQ · QCU garden care';
-  $('#app').innerHTML=`<div class="landing"><header class="landing-header"><a class="university" href="/"><img src="/img/qculogo.png" alt="Quezon City University seal" width="76" height="76"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><a class="btn" href="login.html">Get started ${icon('arrow')}</a></header><main><section class="landing-intro"><div><h1><img class="welcome-logo" src="/img/landing_welcomemsg.png" alt="Welcome to BotaniQ"></h1></div><div class="landing-copy"><p>A shared garden.<br>A little care, every day.</p><p>Keep QCU’s garden growing with clear tasks, planting schedules, and a record of every crop.</p></div></section><figure class="landing-photo"><img src="/img/landingpage_bg.png" alt="Vegetable beds and greenhouses at Quezon City University" width="778" height="825"></figure></main><footer class="landing-footer"><a class="brand" href="/"><img src="/img/landing_botaniq.png" alt="BotaniQ"></a><p>Garden Tracker of Quezon City University</p></footer></div>`;
+  $('#app').innerHTML=`<div class="landing"><header class="landing-header"><a class="university" href="/"><img src="/img/qculogo.png" alt="Quezon City University seal" width="76" height="76"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><a class="btn" href="login.html">Get started ${icon('arrow')}</a></header><main><section class="landing-intro"><div><h1><img class="welcome-logo" src="/img/landing_welcomemsg.png" alt="Welcome to BotaniQ"></h1></div><div class="landing-copy"><p>A shared garden.<br>A little care, every day.</p><p>Keep QCU’s garden growing with clear tasks, planting schedules, and a record of every crop.</p></div></section><figure class="landing-scene">${gardenScene()}</figure></main><footer class="landing-footer"><a class="brand" href="/"><img src="/img/landing_botaniq.png" alt="BotaniQ"></a><p>Garden Tracker of Quezon City University</p></footer></div>`;
 }
 function renderLogin() {
   $('#modal').close();document.title='BotaniQ · Log in';
@@ -71,9 +113,8 @@ function renderLogin() {
   $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,submit=form.querySelector('button');submit.disabled=true;try{await api('login',Object.fromEntries(new FormData(form)));history.replaceState({},'','index.html');await refresh();history.replaceState({},'',href('dashboard'));toast('Welcome back. Your garden is ready.');}catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}});
 }
 function shell() {
-  const names={dashboard:'Overview',plots:'Garden plots',tasks:'Maintenance tasks',inventory:'Crop information',staff:'Staff & access',nutrients:'Nutrient log'};
-  const links=[['dashboard','grid'],['tasks','tasks'],['plots','sprout'],['inventory','leaf'],...(isAdmin()?[['staff','users']]:[])];
-  $('#app').innerHTML=`<aside class="sidebar" id="sidebar"><button class="icon-button sidebar-close" data-action="menu" aria-label="Close navigation">${icon('close')}</button><a class="brand" href="${href('dashboard')}"><img class="brand-logo" src="/img/Logo.png" alt="BotaniQ"></a><div class="workspace">Garden workspace</div><nav class="nav" aria-label="Main navigation">${links.map(([name,ic])=>`<a href="${href(name)}" class="${view===name?'active':''}" ${view===name?'aria-current="page"':''} title="${names[name]}">${icon(ic)}<span>${names[name]}</span></a>`).join('')}</nav><div class="sidebar-bottom"><div class="garden-note">${icon('sprout')}<strong>Small steps. Lasting growth.</strong>Every record helps us care for a greener campus.</div><small>CUAI · QUEZON CITY UNIVERSITY</small></div></aside><div class="layout"><header class="topbar"><button class="icon-button mobile-menu" data-action="menu" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb">Workspace <span>/</span> <strong>${names[view]}</strong></div><div class="top-spacer"></div><label class="search">${icon('search')}<input id="search" type="search" placeholder="Search" aria-label="Search current page" value="${escape(search)}"></label><button class="icon-button" data-action="notifications" aria-label="Notifications">${icon('bell')}</button><div class="profile-wrap"><button class="profile" data-action="account" aria-label="Account settings" aria-expanded="false" aria-controls="profile-menu"><span class="avatar">${escape(initials(state.user.full_name))}</span><div><strong>${escape(state.user.full_name)}</strong><small>${isAdmin()?'Garden administrator':'Garden staff'}</small></div></button><div id="profile-menu" class="profile-menu" hidden><strong>${escape(state.user.full_name)}</strong><span>${escape(state.user.email)}</span>${button('Edit profile','edit-profile','','text','pencil')}${button('Sign out','logout','','text')}</div></div></header><main class="main" id="main"></main></div>`;
+  const links=[['dashboard','grid'],['tasks','tasks'],['plots','sprout'],['inventory','leaf'],...(isAdmin()?[['reports','report'],['staff','users']]:[])];
+  $('#app').innerHTML=`<aside class="sidebar" id="sidebar"><button class="icon-button sidebar-close" data-action="menu" aria-label="Close navigation">${icon('close')}</button><a class="brand" href="${href('dashboard')}"><img class="brand-logo" src="/img/Logo.png" alt="BotaniQ"></a><div class="workspace">Garden workspace</div><nav class="nav" aria-label="Main navigation">${links.map(([name,ic])=>`<a href="${href(name)}" class="${view===name?'active':''}" ${view===name?'aria-current="page"':''} title="${pageNames[name]}">${icon(ic)}<span>${pageNames[name]}</span></a>`).join('')}</nav><div class="sidebar-bottom"><div class="garden-note">${icon('sprout')}<strong>Small steps. Lasting growth.</strong>Every record helps us care for a greener campus.</div><small>CUAI · QUEZON CITY UNIVERSITY</small></div></aside><div class="layout"><header class="topbar"><button class="icon-button mobile-menu" data-action="menu" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb">Workspace <span>/</span> <strong>${pageNames[view]}</strong></div><div class="top-spacer"></div><label class="search">${icon('search')}<input id="search" type="search" placeholder="Search" aria-label="Search current page" value="${escape(search)}"></label><button class="icon-button" data-action="notifications" aria-label="Notifications">${icon('bell')}</button><div class="profile-wrap"><button class="profile" data-action="account" aria-label="Account settings" aria-expanded="false" aria-controls="profile-menu"><span class="avatar">${escape(initials(state.user.full_name))}</span><div><strong>${escape(state.user.full_name)}</strong><small>${isAdmin()?'Garden administrator':'Garden staff'}</small></div></button><div id="profile-menu" class="profile-menu" hidden><strong>${escape(state.user.full_name)}</strong><span>${escape(state.user.email)}</span>${button('Edit profile','edit-profile','','text','pencil')}${button('Sign out','logout','','text')}</div></div></header><main class="main" id="main"></main></div>`;
   updateBell();
   $('#search').addEventListener('input',event=>{search=event.target.value;renderMain();});
   renderMain();
@@ -86,27 +127,38 @@ function renderMain() {
   if(view==='dashboard') content=dashboard();
   if(view==='plots') {const p=selectedPlot();if(p&&isGreenhouse(p))history.replaceState({},'',`plot-info.html?greenhouse=${p.plot_id}`);content=plotsPage();}
   if(view==='tasks') content=tasksPage();
+  if(view==='reports') content=isAdmin()?reportsPage():empty('Task reports are available to administrators.');
   if(view==='inventory') content=inventoryPage();
   if(view==='staff') content=isAdmin()?staffPage():empty('Staff management is available to administrators.');
   $('#main').classList.toggle('overview-page',view==='dashboard');
   $('#main').innerHTML=content+`<footer class="footer"><span>${icon('leaf')}Growing with purpose. Caring for our campus.</span><span>BotaniQ · CUAI Garden Management &nbsp; / &nbsp; Demo garden</span></footer>`;
   mountGardenMap();
   $('#staff-filter')?.addEventListener('change',event=>{staffFilter=event.target.value;renderMain();});
+  $('#report-staff')?.addEventListener('change',event=>{reportStaff=event.target.value;renderMain();});
   $('#crop-search')?.addEventListener('input',event=>{
     cropSearch=event.target.value;
     const next=document.createElement('div');next.innerHTML=inventoryPage();
     $('#crop-results').replaceWith(next.querySelector('#crop-results'));
   });
-  document.title=`BotaniQ · ${{dashboard:'Overview',plots:'Garden plots',tasks:'Maintenance tasks',inventory:'Crop information',staff:'Staff & access',nutrients:'Nutrient log'}[view]}`;
+  document.title=`BotaniQ · ${pageNames[view]}`;
 }
 function filters(items,selected,action) { return `<div class="filters">${items.map(item=>`<button class="filter ${item===selected?'active':''}" data-action="${action}" data-id="${item}" aria-pressed="${item===selected}">${item}</button>`).join('')}</div>`; }
+function coverAlert() {
+  const count=isAdmin()?state.tasks.filter(t=>needsCover(t,state.today)).length:(state.invites||[]).length;
+  if(!count)return '';
+  return `<div class="cover-alert">${icon('bell')}<p><strong>${count} task${count===1?' needs':'s need'} taking over</strong>${isAdmin()?'Staff were notified. Reassign it if nobody steps in.':'A teammate asked for help. Accept to move the task to your queue.'}</p>${button('Review','notifications','','small')}</div>`;
+}
+function taskSummaryStrip() {
+  const {missed,ongoing,dueToday}=taskSummary(state.tasks,state.today),latest=missed[0];
+  return `<section class="task-summary" aria-label="Task summary"><a href="tasks.html" data-summary="Missed"><strong>${missed.length}</strong><span>Missed tasks<small>${latest?`Latest: ${escape(latest.task_type)}, ${escape(latest.plot_code)}, ${fmt(latest.scheduled_date)}`:'Nothing missed so far.'}</small></span>${icon('arrow')}</a><a href="tasks.html" data-summary="Open"><strong>${ongoing.length}</strong><span>Ongoing tasks<small>${dueToday} due today · ${ongoing.length-dueToday} upcoming</small></span>${icon('arrow')}</a></section>`;
+}
 function dashboard() {
   const pending=assignedPending(state.tasks,state.user.user_id);
   const team=state.tasks.filter(t=>t.status==='Pending');
   const tasks=(isAdmin()?team:pending).filter(t=>!calendarDate||t.scheduled_date===calendarDate);
   const stats=overviewPlots(state);
   return heading(`Welcome, ${escape(isAdmin()?'Admin':state.user.full_name.split(' ')[0])}.`,`${fmt(state.today)} · ${isAdmin()?team.length+' team tasks':pending.length+' of your tasks'} still need care.`,isAdmin()?button('Schedule task','new-task','','','plus'):button('View my tasks','my-tasks','','','tasks'))+
-    `<div class="stats care-stats">${stats.map(({label,plots},i)=>`<button class="stat" data-action="stat-plots" data-id="${i}" aria-label="${label}: ${plots.length}. View plots"><span class="stat-top">${label}</span><span class="stat-value">${plots.length}</span><span class="stat-foot">View plots →</span></button>`).join('')}</div><div class="care-grid ${isAdmin()?'admin-care':''}"><section class="panel care-queue">${panelHead(isAdmin()?'Team assignments':'Your tasks',calendarDate?fmt(calendarDate):'Unfinished care, ordered by schedule.',link('View all','tasks'))}${calendarDate?button('Show all dates','calendar-clear','','text small'):''}<div class="task-list">${tasks.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||''])).slice(0,4).map(t=>`<div class="care-row"><div><a href="plot-info.html?id=${t.plot_id}">${escape(t.plot_code)}</a><h3>${escape(t.task_type)}</h3><p>${isAdmin()?escape(t.assigned_staff||'Unassigned')+' · ':''}${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}</p></div><div>${t.scheduled_date<state.today?badge('Overdue','amber'):''}${t.scheduled_date===state.today&&!isAdmin()?button('Complete','complete',t.task_id,'secondary small','check'):t.scheduled_date>state.today?badge('Upcoming','gray'):''}</div></div>`).join('')||empty(calendarDate?'No unfinished tasks on this date.':'All caught up. No unfinished tasks.')}</div>${tasks.length>4?`<p class="queue-more">${tasks.length-4} more tasks in Maintenance tasks.</p>`:''}</section>${isAdmin()?`<aside class="panel team-summary">${panelHead('Garden team','Today’s assignments completed today')}${state.users.filter(u=>u.role==='Staff'&&u.active) .map(u=>{const {total,completed}=dailyProgress(state.tasks,u.user_id,state.today);return `<div class="team-row"><span class="avatar">${escape(initials(u.full_name))}</span><span>${escape(u.full_name)}</span><div class="team-progress"><progress value="${completed}" max="${total||1}" aria-label="${escape(u.full_name)}: ${completed} of ${total} assignments completed today"></progress><small>${total?`${completed} / ${total} completed`:'No tasks today'}</small></div></div>`;}).join('')||empty('No staff accounts yet.')}</aside>`:taskCalendar(pending)}</div>`;
+    `<div class="stats care-stats">${stats.map(({label,plots},i)=>`<button class="stat" data-action="stat-plots" data-id="${i}" aria-label="${label}: ${plots.length}. View plots"><span class="stat-top">${label}</span><span class="stat-value">${plots.length}</span><span class="stat-foot">View plots →</span></button>`).join('')}</div>${coverAlert()}${taskSummaryStrip()}<div class="care-grid ${isAdmin()?'admin-care':''}"><section class="panel care-queue">${panelHead(isAdmin()?'Team assignments':'Your tasks',calendarDate?fmt(calendarDate):'Unfinished care, ordered by schedule.',link('View all','tasks'))}${calendarDate?button('Show all dates','calendar-clear','','text small'):''}<div class="task-list">${tasks.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||''])).slice(0,4).map(t=>`<div class="care-row"><div><a href="plot-info.html?id=${t.plot_id}">${escape(t.plot_code)}</a><h3>${escape(t.task_type)}</h3><p>${isAdmin()?escape(t.assigned_staff||'Unassigned')+' · ':''}${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}</p></div><div>${t.scheduled_date<state.today?badge('Overdue','amber'):''}${t.scheduled_date===state.today&&!isAdmin()?button('Complete','complete',t.task_id,'secondary small','check'):t.scheduled_date>state.today?badge('Upcoming','gray'):''}</div></div>`).join('')||empty(calendarDate?'No unfinished tasks on this date.':'All caught up. No unfinished tasks.')}</div>${tasks.length>4?`<p class="queue-more">${tasks.length-4} more tasks in Maintenance tasks.</p>`:''}</section>${isAdmin()?`<aside class="panel team-summary">${panelHead('Garden team','Today’s assignments completed today')}${state.users.filter(u=>u.role==='Staff'&&u.active) .map(u=>{const {total,completed}=dailyProgress(state.tasks,u.user_id,state.today);return `<div class="team-row"><span class="avatar">${escape(initials(u.full_name))}</span><span>${escape(u.full_name)}</span><div class="team-progress"><progress value="${completed}" max="${total||1}" aria-label="${escape(u.full_name)}: ${completed} of ${total} assignments completed today"></progress><small>${total?`${completed} / ${total} completed`:'No tasks today'}</small></div></div>`;}).join('')||empty('No staff accounts yet.')}</aside>`:taskCalendar(pending)}</div>`;
 }
 function taskCalendar(pending) {
   const month=calendarMonth(state.today,calendarOffset,pending);
@@ -122,10 +174,11 @@ function filterMap() {
     el.setAttribute('aria-pressed',String(el.dataset.id===zone));
   });
 }
+function plotStage(cycle) { const {label,days}=growthStage(cycle,state.today);return {label,detail:`${days} day${days===1?'':'s'} since planting`}; }
 function plotsPage() {
-  const house=greenhouse();
+  const house=greenhouse(),spaces=mapPlots().filter(isGrowingPlot),occupied=spaces.filter(p=>plotOccupancy(p)==='Occupied').length;
   return heading(house?escape(house.plot_code):'CUAI Garden Atlas',house?'Each bed has its own crop, care tasks and editable layout.':'Every plot gets the care it needs.',(house?'<a class="btn secondary" href="plot-info.html">Back to garden</a>':'')+(isAdmin()?button(editingMap?'Done editing map':'Edit map','map-edit','','',editingMap?'check':'pencil'):''))+
-    `<div class="toolbar">${filters(['All zones','Greenhouse','Outdoor','Nursery','Open space'],zone,'zone')}<span class="muted"><small>Tap a space. See what’s growing.</small></span></div><div class="atlas-layout ${isAdmin()?'with-tasks':''}">${isAdmin()?`<aside class="panel atlas-tasks">${panelHead('Unfinished tasks','Staff assignments')}${state.tasks.filter(t=>t.status==='Pending'&&match([t.task_type,t.plot_code,t.assigned_staff||''])).map(t=>`<a class="atlas-task" href="tasks.html?task=${t.task_id}" data-task-date="${t.scheduled_date}"><strong>${escape(t.task_type)}</strong><span>${escape(t.plot_code)} · ${escape(t.assigned_staff||'Unassigned')}</span><small>${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}${t.scheduled_date<state.today?' · Overdue':''}</small></a>`).join('')||empty('No unfinished tasks.')}</aside>`:''}${gardenMap()}</div>`;
+    `<div class="toolbar">${filters(['All zones','Greenhouse','Outdoor','Nursery','Open space'],zone,'zone')}<span class="muted"><small>${occupied} occupied · ${spaces.length-occupied} vacant</small></span></div><div class="atlas-layout ${isAdmin()?'with-tasks':''}">${isAdmin()?`<aside class="panel atlas-tasks">${panelHead('Unfinished tasks','Staff assignments')}${state.tasks.filter(t=>t.status==='Pending'&&match([t.task_type,t.plot_code,t.assigned_staff||''])).map(t=>`<a class="atlas-task" href="tasks.html?task=${t.task_id}" data-task-date="${t.scheduled_date}"><strong>${escape(t.task_type)}</strong><span>${escape(t.plot_code)} · ${escape(t.assigned_staff||'Unassigned')}</span><small>${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}${t.scheduled_date<state.today?' · Overdue':''}</small></a>`).join('')||empty('No unfinished tasks.')}</aside>`:''}${gardenMap()}</div>`;
 }
 function gardenMap(compact=false) {
   const house=greenhouse(),plots=mapPlots();
@@ -146,15 +199,15 @@ function gardenMap(compact=false) {
         ${plots.map(mapPlotMarkup).join('')}
       </g>
     </svg></div>
-    <div class="map-bottom"><div class="map-key"><span class="indoor-key">Greenhouse — open to view beds</span><span class="outdoor-key">Outdoor beds</span><span class="nursery-key">Nursery</span><span class="space-key">Open space</span><span class="vacant-key">Dashed = vacant</span><span class="task-key">! Your unfinished task</span></div><div class="map-controls"><button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button><button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
-    ${house?`<div class="greenhouse-beds">${plots.map(p=>{const crop=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);return `<button class="greenhouse-bed" data-action="map-plot" data-id="${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(crop?`${crop.crop_name}${crop.variety?' · '+crop.variety:''}`:'Available for planting')}</span></button>`;}).join('')||empty(isAdmin()?'No beds yet. Choose Edit map, then Add bed to lay out this greenhouse.':'No beds have been added yet.')}</div>`:''}
+    <div class="map-bottom"><div class="map-key"><span class="indoor-key">Greenhouse — open to view beds</span><span class="outdoor-key">Outdoor beds</span><span class="nursery-key">Nursery</span><span class="space-key">Open space</span><span class="occupied-key">Solid = occupied</span><span class="vacant-key">Dashed = vacant</span><span class="task-key">! Your unfinished task</span></div><div class="map-controls"><button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button><button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
+    ${house?`<div class="greenhouse-beds">${plots.map(p=>{const crop=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);return `<button class="greenhouse-bed" data-action="map-plot" data-id="${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(crop?`Occupied · ${crop.crop_name}${crop.variety?' · '+crop.variety:''} · ${growthStage(crop,state.today).label}`:'Vacant · Ready for planting')}</span></button>`;}).join('')||empty(isAdmin()?'No beds yet. Choose Edit map, then Add bed to lay out this greenhouse.':'No beds have been added yet.')}</div>`:''}
     ${compact?'':'<aside id="plot-inspector" class="plot-inspector" aria-label="Selected plot" hidden></aside>'}
   </section>`;
 }
 function mapPlotMarkup(p) {
           const slot=p.map_slot||p.plot_id,[x,y,w,h]=plotBounds(p),c=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);
           const beds=activePlots().filter(b=>b.parent_plot_id===p.plot_id);
-          const caption=isGreenhouse(p)?`${beds.length} bed${beds.length===1?'':'s'}`:p.zone==='Open space'?'No planting':c?.crop_name||'Available for planting';
+          const caption=isGreenhouse(p)?`${beds.length} bed${beds.length===1?'':'s'}`:p.zone==='Open space'?'No planting':c?`${c.crop_name} · ${growthStage(c,state.today).label}`:'Vacant';
           const occupancy=isGreenhouse(p)?(beds.some(b=>b.occupancy_status==='Occupied')?'Occupied':'Vacant'):p.occupancy_status;
           const muted=!matchesPlot(p);
           const assigned=assignedPending(state.tasks,state.user.user_id).some(t=>t.plot_id===p.plot_id||beds.some(b=>b.plot_id===t.plot_id));
@@ -326,10 +379,10 @@ function renderPlotInspector() {
   const c=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date),record=plotOverview(state,p,c);
   if(p.zone==='Open space'){record.crop_name='Open space';if(!state.entries.some(e=>e.plot_id===p.plot_id))record.description='Unplanted space for access, storage or other garden use.';}
   panel.hidden=false;
-  panel.innerHTML=`<div class="inspector-heading"><div><span class="eyebrow">${p.removed_at?'Removed from map':escape(p.zone)} · Plot ${p.map_slot||p.plot_id}</span><h2 id="plot-heading" tabindex="-1">${escape(p.plot_code)}</h2></div><div class="inspector-buttons">${isAdmin()&&!p.removed_at&&plotTab==='overview'&&!editingPlot?`<button class="icon-button" data-action="plot-edit" aria-label="Edit plot details">${icon('pencil')}</button>`:''}<button class="btn plot-exit" data-action="map-reset" aria-label="Exit plot details">${icon('close')} Exit plot</button></div></div>
+  panel.innerHTML=`<div class="inspector-heading"><div><span class="eyebrow">${p.removed_at?'Removed from map':escape(p.zone)} · Plot ${p.map_slot||p.plot_id}</span><h2 id="plot-heading" tabindex="-1">${escape(p.plot_code)}</h2>${p.zone==='Open space'||p.removed_at?'':`<div class="plot-status-row">${statusBadge(plotOccupancy(p))}${c?`${badge(plotStage(c).label,plotStage(c).label==='Seedling'?'amber':'')}<small>${plotStage(c).detail}</small>`:''}</div>`}</div><div class="inspector-buttons">${isAdmin()&&!p.removed_at&&plotTab==='overview'&&!editingPlot?`<button class="icon-button" data-action="plot-edit" aria-label="Edit plot details">${icon('pencil')}</button>`:''}<button class="btn plot-exit" data-action="map-reset" aria-label="Exit plot details">${icon('close')} Exit plot</button></div></div>
     <div class="tabs inspector-tabs" role="tablist" aria-label="Plot information">${['overview','history'].map(tab=>`<button id="tab-${tab}" class="tab ${plotTab===tab?'active':''}" role="tab" aria-selected="${plotTab===tab}" aria-controls="plot-tab-content" tabindex="${plotTab===tab?0:-1}" data-action="plot-tab" data-id="${tab}">${tab==='overview'?'Overview':'History'}</button>`).join('')}</div>
     <div id="plot-tab-content" class="inspector-content" role="tabpanel" aria-labelledby="tab-${plotTab}">
-    ${plotTab==='history'?historyPanel(p):editingPlot&&isAdmin()&&!p.removed_at?plotEditor(record):`${plotFacts(record,p)}<div class="plot-state">${statusBadge(p.occupancy_status)}<span>Times in Asia/Manila</span></div>`}</div>`;
+    ${plotTab==='history'?historyPanel(p):editingPlot&&isAdmin()&&!p.removed_at?plotEditor(record):`${plotFacts(record,p)}<div class="plot-state"><span>Times in Asia/Manila</span></div>`}</div>`;
   if(editingPlot)bindPlotEditor(p,record);
   if(plotTab==='history') {
     for(const id of ['history-query','history-fertilizer','history-from','history-to'])$('#'+id).addEventListener('input',()=>{
@@ -414,23 +467,55 @@ window.addEventListener('resize',()=>{if(view==='plots')zoomMap(selectedPlot());
 function taskDetails(t) {
   const own=t.assigned_staff_id===state.user.user_id,pending=t.status==='Pending',due=t.scheduled_date===state.today;
   const adjustments=state.adjustments.filter(a=>a.task_id===t.task_id);
-  return `<details class="task-item" ${Number(new URLSearchParams(location.search).get('task'))===t.task_id?'open':''}><summary><span class="task-symbol">${icon(t.task_type==='Manual watering'?'drop':'tasks')}</span><span class="task-identity"><strong>${escape(t.task_type)}</strong><span>${escape(t.plot_code)} · ${escape(t.assigned_staff||'Unassigned')}</span></span><span class="task-due">${escape(t.scheduled_date>state.today?fmt(t.scheduled_date):taskDateLabel(t.scheduled_date,state.today))}<small>${clock(t.scheduled_time)}</small><small>${t.scheduled_date<=state.today?fmt(t.scheduled_date):''}</small></span>${pending?badge(t.scheduled_date<state.today?'Overdue':'Open','amber'):statusBadge(t.status)}<span class="task-chevron" aria-hidden="true">⌄</span></summary><div class="task-detail"><p><a href="plot-info.html?id=${t.plot_id}">Open ${escape(t.plot_code)}</a> · ${escape(t.zone)}</p>${t.substitute_staff?`<p class="reason"><strong>Covered by ${escape(t.substitute_staff)}</strong><br>${escape(t.takeover_reason)}<br>${t.is_flagged_for_admin?'Awaiting admin review':'Reviewed by admin'}</p>`:''}${adjustments.map(a=>`<p class="reason"><strong>${escape(a.action)} · ${escape(a.full_name)}</strong><br>${escape(a.reason)}<br>${escape(a.previous_schedule)}${a.new_schedule?` → ${escape(a.new_schedule)}`:''}</p>`).join('')}<div class="actions">${pending&&own&&!isAdmin()&&due?button('Mark complete','complete',t.task_id,'small','check'):''}${pending&&(own||isAdmin())&&t.scheduled_date>=state.today?button('Request cover','request-cover',t.task_id,'secondary small'):''}${pending&&own&&!isAdmin()&&t.task_type==='Manual watering'?button('Weather adjustment','adjust',t.task_id,'secondary small'):''}${pending&&isAdmin()?button('Reassign','task-assignment',t.task_id,'text'):''}${!isAdmin()&&(own||t.substitute_staff_id===state.user.user_id)?button('Message admin','task-message',t.task_id,'secondary small'):''}</div></div></details>`;
+  return `<details class="task-item" ${Number(new URLSearchParams(location.search).get('task'))===t.task_id?'open':''}><summary><span class="task-symbol">${icon(t.task_type==='Manual watering'?'drop':'tasks')}</span><span class="task-identity"><strong>${escape(t.task_type)}</strong><span>${escape(t.plot_code)} · ${escape(t.assigned_staff||'Unassigned')}</span></span><span class="task-due">${escape(t.scheduled_date>state.today?fmt(t.scheduled_date):taskDateLabel(t.scheduled_date,state.today))}<small>${clock(t.scheduled_time)}</small><small>${t.scheduled_date<=state.today?fmt(t.scheduled_date):''}</small></span>${needsCover(t,state.today)?badge('Needs cover','amber'):''}${pending?badge(t.scheduled_date<state.today?'Overdue':'Open','amber'):statusBadge(t.status)}<span class="task-chevron" aria-hidden="true">⌄</span></summary><div class="task-detail"><p><a href="plot-info.html?id=${t.plot_id}">Open ${escape(t.plot_code)}</a> · ${escape(t.zone)}</p>${t.substitute_staff?`<p class="reason"><strong>${t.covered_for?`Taken over from ${escape(t.covered_for)} by`:'Covered by'} ${escape(t.substitute_staff)}</strong><br>${escape(t.takeover_reason)}<br>${t.is_flagged_for_admin?'Awaiting admin review':'Reviewed by admin'}</p>`:''}${adjustments.map(a=>`<p class="reason"><strong>${escape(a.action)} · ${escape(a.full_name)}</strong><br>${escape(a.reason)}<br>${escape(a.previous_schedule)}${a.new_schedule?` → ${escape(a.new_schedule)}`:''}</p>`).join('')}<div class="actions">${pending&&own&&!isAdmin()&&due?button('Mark complete','complete',t.task_id,'small','check'):''}${pending&&(own||isAdmin())&&t.scheduled_date>=state.today&&!t.needs_cover?button('Request cover','request-cover',t.task_id,'secondary small'):''}${pending&&own&&!isAdmin()&&t.task_type==='Manual watering'?button('Weather adjustment','adjust',t.task_id,'secondary small'):''}${pending&&isAdmin()?button('Reassign','task-assignment',t.task_id,'text'):''}${!isAdmin()&&(own||t.substitute_staff_id===state.user.user_id)?button('Message admin','task-message',t.task_id,'secondary small'):''}</div></div></details>`;
 }
 function tasksPage() {
   const scoped=state.tasks.filter(t=>isAdmin()?(staffFilter==='all'||String(t.assigned_staff_id)===staffFilter):t.assigned_staff_id===state.user.user_id);
-  const tasks=scoped.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||'',t.substitute_staff||''])&&(taskFilter==='Done'?t.status!=='Pending':t.status==='Pending'&&(taskFilter!=='Overdue'||t.scheduled_date<state.today)));
+  const tasks=scoped.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||'',t.substitute_staff||''])&&(taskFilter==='Done'?['Completed','Skipped'].includes(t.status):taskFilter==='Missed'?isMissed(t,state.today):t.status==='Pending'));
   const quietToday=!isAdmin()&&taskFilter==='Open'&&!search&&!scoped.some(t=>t.status==='Pending'&&t.scheduled_date<=state.today);
-  return heading('Maintenance tasks','Dated care, with overdue tasks shown first.',isAdmin()?button('Schedule task','new-task','','','plus'):'')+`<section class="task-board"><div class="task-toolbar">${filters(['Open','Overdue','Done'],taskFilter,'task-filter')}${!isAdmin()?'My tasks':`<label class="task-scope">Show<select id="staff-filter"><option value="all">All team assignments</option>${options(state.users.filter(u=>u.role==='Staff'),'user_id','full_name',staffFilter)}</select></label>`}</div>${quietToday?empty('Nothing due today. Your garden is in good hands.'):''}${tasks.map(taskDetails).join('')||(!quietToday?empty('No '+taskFilter.toLowerCase()+' tasks match this view.'):'')}</section>${isAdmin()?'<button class="task-fab" data-action="new-task" aria-label="Schedule a task">'+icon('plus')+'</button>':''}`;
+  return heading('Maintenance tasks','Dated care, with missed tasks shown first.',isAdmin()?button('Schedule task','new-task','','','plus'):'')+`<section class="task-board"><div class="task-toolbar">${filters(['Open','Missed','Done'],taskFilter,'task-filter')}${!isAdmin()?'My tasks':`<label class="task-scope">Show<select id="staff-filter"><option value="all">All team assignments</option>${options(state.users.filter(u=>u.role==='Staff'),'user_id','full_name',staffFilter)}</select></label>`}</div>${quietToday?empty('Nothing due today. Your garden is in good hands.'):''}${tasks.map(taskDetails).join('')||(!quietToday?empty('No '+taskFilter.toLowerCase()+' tasks match this view.'):'')}</section>${isAdmin()?'<button class="task-fab" data-action="new-task" aria-label="Schedule a task">'+icon('plus')+'</button>':''}`;
+}
+function reportNote(t) {
+  if(t.covered_for)return `Taken over from ${t.covered_for}${t.takeover_reason?`: ${t.takeover_reason}`:''}`;
+  return t.substitute_staff?`Covered by ${t.substitute_staff}`:'';
+}
+function reportsPage() {
+  const period=reportPeriod(state.today,reportKind,reportOffset),staff=state.users.filter(u=>u.role==='Staff'&&u.active);
+  const reports=staff.filter(u=>(reportStaff==='all'||String(u.user_id)===reportStaff)&&match([u.full_name])).map(u=>({...u,...staffReport(state.tasks,u.user_id,period,state.today)}));
+  const total=key=>reports.reduce((sum,r)=>sum+r[key],0);
+  const columns=[['assigned','Assigned'],['completed','Completed'],['missed','Missed'],['ongoing','Ongoing'],['skipped','Skipped'],['takenOver','Taken over'],['handedOver','Handed over']];
+  const rate=value=>value===null?'—':`${value}%`;
+  const due=total('completed')+total('missed')+total('skipped');
+  return heading('Task reports','Weekly and monthly staff summaries. They update on their own and are ready to print.',button('Print report','report-print','','','printer'))+
+    `<div class="report-toolbar">${filters(['Weekly','Monthly'],reportKind,'report-kind')}<div class="report-step"><button class="icon-button" data-action="report-step" data-id="-1" aria-label="Previous period">‹</button><strong>${period.label}</strong><button class="icon-button" data-action="report-step" data-id="1" aria-label="Next period" ${reportOffset>=0?'disabled':''}>›</button></div><label class="task-scope">Show<select id="report-staff"><option value="all">All staff</option>${options(staff,'user_id','full_name',reportStaff)}</select></label></div>
+    <article class="report-paper" aria-label="${reportKind} task report">
+      <header class="report-head"><img src="/img/qculogo.png" alt="" width="56" height="56"><div><p>Quezon City University · CUAI Garden</p><h2>${reportKind} task report</h2></div><dl><div><dt>Period</dt><dd>${period.label}</dd></div><div><dt>Generated</dt><dd>${fmt(state.today)}</dd></div></dl></header>
+      <h3>Summary by staff</h3>
+      ${reports.length?`<div class="table-wrap"><table class="report-table"><thead><tr><th>Staff</th>${columns.map(([,label])=>`<th class="numeric">${label}</th>`).join('')}<th class="numeric">Completion</th></tr></thead><tbody>${reports.map(r=>`<tr><td>${escape(r.full_name)}</td>${columns.map(([key])=>`<td class="numeric">${r[key]}</td>`).join('')}<td class="numeric">${rate(r.rate)}</td></tr>`).join('')}</tbody>${reports.length>1?`<tfoot><tr><th>Total</th>${columns.map(([key])=>`<td class="numeric">${total(key)}</td>`).join('')}<td class="numeric">${rate(due?Math.round(total('completed')/due*100):null)}</td></tr></tfoot>`:''}</table></div>`:empty('No staff match this report.')}
+      <p class="report-note">Completion counts closed tasks only: completed, missed and skipped. Ongoing tasks are not held against anyone.</p>
+      ${reports.map(r=>`<section class="report-staff"><h3>${escape(r.full_name)}</h3>${r.rows.length?`<div class="table-wrap"><table class="report-table"><thead><tr><th>Date</th><th>Time</th><th>Task</th><th>Plot</th><th>Status</th><th>Notes</th></tr></thead><tbody>${r.rows.map(t=>`<tr><td>${fmt(t.scheduled_date)}</td><td>${clock(t.scheduled_time)}</td><td>${escape(t.task_type)}</td><td>${escape(t.plot_code)}</td><td>${reportStatus(t,state.today)}</td><td>${escape(reportNote(t))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="report-none">No tasks assigned in this period.</p>'}</section>`).join('')}
+      <footer class="report-sign"><div><span>${escape(state.user.full_name)}</span><small>Prepared by</small></div><div><span></span><small>Noted by</small></div></footer>
+    </article>`;
 }
 function inventoryPage() { const plants=state.plants.filter(p=>match([p.crop_name,p.variety,p.notes])&&`${p.crop_name} ${p.variety||''} ${p.notes||''}`.toLowerCase().includes(cropSearch.trim().toLowerCase()));return heading('Crop Information','Every plot gets the care it needs.',isAdmin()?button('Add crop','new-plant','','','plus'):'')+`<div class="catalog-filter"><label for="crop-search">Find a crop or variety</label><input id="crop-search" type="search" value="${escape(cropSearch)}" placeholder="Search crops, varieties or notes" autocomplete="off"></div><section class="panel" id="crop-results" aria-live="polite">${panelHead('Crop information',`${state.plants.length} crop varieties in the garden catalog`)}${plants.length?`<div class="table-wrap"><table class="crop-table"><thead><tr><th>Crop</th><th>Variety</th><th class="numeric">Live cycles</th><th>Growing notes</th><th></th></tr></thead><tbody>${plants.map(p=>`<tr><td><strong>${escape(p.crop_name)}</strong></td><td data-label="Variety">${escape(p.variety||'—')}</td><td data-label="Live cycles" class="numeric">${state.cycles.filter(c=>c.plant_id===p.plant_id&&!c.harvest_date).length}</td><td data-label="Growing notes">${escape(p.notes||'—')}</td><td>${isAdmin()?button('Plant crop','plant-crop',p.plant_id,'secondary small'):''}</td></tr>`).join('')}</tbody></table></div>`:empty('No crops match your search.')}</section>`; }
 function staffPage() { return heading('Staff and Access','Every plot gets the care it needs.',button('Add account','new-user','','','plus'))+`<div class="account-grid">${state.users.filter(u=>match([u.full_name,u.email,u.role])).map(u=>`<article class="person-card"><span class="avatar">${escape(initials(u.full_name))}</span><h3>${escape(u.full_name)}</h3><p>${escape(u.email)}<br>${u.role} · ${state.tasks.filter(t=>t.assigned_staff_id===u.user_id&&t.status==='Pending').length} pending tasks</p><div class="person-bottom">${badge(u.active?'Active':'Inactive',u.active?'':'gray')}${u.user_id!==state.user.user_id?button('Remove account','remove-user',u.user_id,'text danger'):'<small class="muted">Your account</small>'}</div></article>`).join('')}</div>`; }
-function modal(title,description,fields,endpoint,extra={},label='Save record') {
+function confirmWarning(warnings) {
+  const dialog=$('#confirm');
+  dialog.innerHTML=`${warnings.map(w=>`<h2>${escape(w.title)}</h2><p>${escape(w.text)}</p>`).join('')}<p class="confirm-question">Do you still want to continue?</p><div class="modal-actions"><button type="button" class="btn secondary" value="cancel">Cancel</button><button type="button" class="btn" value="continue">Continue</button></div>`;
+  dialog.returnValue='';
+  return new Promise(resolve=>{
+    dialog.onclick=event=>{const value=event.target.closest('button')?.value;if(value)dialog.close(value);};
+    dialog.onclose=()=>resolve(dialog.returnValue==='continue');
+    dialog.showModal();
+  });
+}
+function modal(title,description,fields,endpoint,extra={},label='Save record',warnings=()=>[]) {
   const dialog=$('#modal');
   dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">${title}</h2><button class="icon-button" data-action="close" aria-label="Close dialog">${icon('close')}</button></div><div class="modal-body"><p>${description}</p><form id="record-form">${fields}<div class="form-error" role="alert"></div><div class="modal-actions"><button type="button" class="btn secondary" data-action="close">Cancel</button><button class="btn" type="submit">${label}</button></div></form></div>`;
-  dialog.showModal();
+  if(!dialog.open)dialog.showModal();
   $('#record-form').addEventListener('submit',async event=>{
     event.preventDefault(); const form=event.currentTarget,submit=form.querySelector('[type="submit"]');submit.disabled=true;
-    try { const result=await api(endpoint,{...Object.fromEntries(new FormData(form)),...extra});dialog.close();if(endpoint==='password'||result.signed_out){state=null;renderLogin();toast('Profile updated. Sign in again.');}else{await refresh();toast(endpoint==='takeover'?'Task added to your open queue.':endpoint==='request-cover'?'Coverage request sent to staff.':endpoint==='profile'?'Profile updated.':endpoint==='remove-user'?'Account removed. Pending work is now unassigned.':endpoint==='task-message'?'Message sent privately to your admin.':'Garden record saved.');} }
+    try { const values=Object.fromEntries(new FormData(form)),found=warnings(values);if(found.length&&!await confirmWarning(found))return;const result=await api(endpoint,{...values,...extra});dialog.close();if(endpoint==='password'||result.signed_out){state=null;renderLogin();toast('Profile updated. Sign in again.');}else{await refresh();toast(endpoint==='takeover'?'Task added to your open queue.':endpoint==='request-cover'?'Coverage request sent to staff.':endpoint==='profile'?'Profile updated.':endpoint==='remove-user'?'Account removed. Pending work is now unassigned.':endpoint==='task-message'?'Message sent privately to your admin.':'Garden record saved.');} }
     catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}
   });
 }
@@ -460,12 +545,14 @@ function openForm(action,id) {
     $('#f-assigned_staff_id').required=false;
   }
   if(action==='new-task') {
-    modal('Schedule garden care','Use individual dated tasks for daily watering, extra sessions, and other garden care.',`<div class="form-grid">${select('Task type','task_type',options(['Manual watering','Fertilizer application','Hydroponic nutrients','General maintenance','Harvest'].map(x=>({x})),'x','x'))}${select('Plot','plot_id',plotOptions())}${field('Date','scheduled_date','date',today,`required min="${today}"`)}${field('Time (Asia/Manila)','scheduled_time','time','08:00','required')}<div class="wide">${select('Assigned staff','assigned_staff_id',staffOptions())}</div></div>`,'tasks');
+    modal('Schedule garden care','Use individual dated tasks for daily watering, extra sessions, and other garden care.',`<div class="form-grid">${select('Task type','task_type',options(['Manual watering','Fertilizer application','Hydroponic nutrients','General maintenance','Harvest'].map(x=>({x})),'x','x'))}${select('Plot','plot_id',plotOptions())}${field('Date','scheduled_date','date',today,`required min="${today}"`)}${field('Time (Asia/Manila)','scheduled_time','time','08:00','required')}<div class="wide">${select('Assigned staff','assigned_staff_id',staffOptions())}</div><p class="task-hint wide" id="task-hint" role="status"></p></div>`,'tasks',{},'Schedule task',values=>taskWarnings(values,state));
     $('#f-assigned_staff_id').required=false;
     const updatePlots=()=>{
       const type=$('#f-task_type').value,previous=$('#f-plot_id').value;
       const plots=activePlots().filter(p=>type==='General maintenance'||isGrowingPlot(p)&&(type!=='Harvest'||state.cycles.some(c=>c.current_plot_id===p.plot_id&&!c.harvest_date)));
-      $('#f-plot_id').innerHTML=options(plots,'plot_id','plot_code',previous)||'<option value="">No eligible plots</option>';
+      const label=p=>{const crop=liveCrop(state,p.plot_id);return `${p.plot_code} · ${isGrowingPlot(p)?crop?`${crop.crop_name}, ${growthStage(crop,state.today).label}`:'Vacant':p.zone}`;};
+      $('#f-plot_id').innerHTML=options(plots.map(p=>({...p,label:label(p)})),'plot_id','label',previous)||'<option value="">No eligible plots</option>';
+      $('#task-hint').textContent={'Manual watering':'Best before 9 AM or after 4 PM, when less water evaporates.','Fertilizer application':'Best on a plot with a growing crop, soon after watering.','Hydroponic nutrients':'For hydroponic greenhouse beds. Staff record the product used when they finish.','General maintenance':'For weeding, repairs and cleaning. Any plot or space can be chosen.','Harvest':'Only plots with a live crop are listed. Completing this task closes the crop cycle.'}[type];
     };
     $('#f-task_type').addEventListener('change',updatePlots);updatePlots();
   }
@@ -475,7 +562,7 @@ function openForm(action,id) {
   if(action==='takeover') modal('Step in for a teammate',`Accept this coverage request to move the task to your open queue.`,textarea('Why are you taking over?','takeover_reason'),'takeover',{task_id:invite.task_id,invite_id:invite.invite_id},'Accept task');
   if(action==='complete') modal('Mark this task complete?',`${escape(task.task_type)} · ${escape(task.plot_code)} · ${fmt(task.scheduled_date)}. Confirm after the manual work is done.`,applicationFields,'complete',{task_id:task.task_id},'Mark complete');
   if(action==='adjust') {
-    modal('Adjust for the weather',`Update watering for ${escape(task.plot_code)} only. Other plots keep their own care schedules.`,`${select('Adjustment','action',options(['Skip','Reschedule'].map(x=>({x})),'x','x'))}<div id="reschedule-fields" hidden>${field('New date','scheduled_date','date',today,`min="${today}"`)}${field('New time','scheduled_time','time',task.scheduled_time)}</div>${textarea('Weather observation and reason','reason')}`,'adjust',{task_id:task.task_id},'Save adjustment');
+    modal('Adjust for the weather',`Update watering for ${escape(task.plot_code)} only. Other plots keep their own care schedules.`,`${select('Adjustment','action',options(['Skip','Reschedule'].map(x=>({x})),'x','x'))}<div id="reschedule-fields" hidden>${field('New date','scheduled_date','date',today,`min="${today}"`)}${field('New time','scheduled_time','time',task.scheduled_time)}</div>${textarea('Weather observation and reason','reason')}`,'adjust',{task_id:task.task_id},'Save adjustment',values=>values.action==='Reschedule'?taskWarnings({...task,scheduled_time:values.scheduled_time},state):[]);
     $('#f-action').addEventListener('change',event=>{const reschedule=event.target.value==='Reschedule';$('#reschedule-fields').hidden=!reschedule;$('#f-scheduled_date').required=reschedule;$('#f-scheduled_time').required=reschedule;});
   }
   if(action==='new-user') modal('Add an authorized account','Use at least 8 characters. Share the initial password securely and ask the staff member to update it in Edit profile.',`${field('Full name','full_name','text','','required maxlength="100"')}${field('Email address','email','email','','required maxlength="150" autocomplete="off"')}${select('Role','role',options(['Staff','Admin'].map(x=>({x})),'x','x'))}${field('Initial password','password','password','','required minlength="8" maxlength="128" autocomplete="new-password"')}`,'users',{},'Create account');
@@ -492,14 +579,14 @@ function updateBell() {
 function notifications() {
   if(!isAdmin()) {
     const dialog=$('#modal');
-    dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">Coverage requests</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div>
+    dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">Tasks that need taking over</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div>
       <div class="notification-body">${(state.invites||[]).map(i=>`<article class="review-row"><div><strong>${escape(i.task_type)} · ${escape(i.plot_code)}</strong><p>${fmt(i.scheduled_date)} · ${clock(i.scheduled_time)}</p>
-      ${button('Take over','takeover',i.invite_id,'small')} ${i.is_read?badge('Read','gray'):button('Mark read','read-invite',i.invite_id,'secondary small')}</div></article>`).join('')||empty('No open coverage requests.')}</div>`;
-    dialog.showModal();return;
+      ${button('Take over','takeover',i.invite_id,'small')} ${i.is_read?badge('Read','gray'):button('Mark read','read-invite',i.invite_id,'secondary small')}</div></article>`).join('')||empty('No tasks need taking over.')}</div>`;
+    if(!dialog.open)dialog.showModal();return;
   }
-  const flags=state.tasks.filter(t=>t.is_flagged_for_admin),messages=state.messages||[];
-  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">Notifications</h2><button class="icon-button" data-action="close" aria-label="Close dialog">${icon('close')}</button></div><div class="notification-body"><h3>Staff messages</h3>${messages.map(m=>`<article class="review-row"><div><strong>${escape(m.full_name)}</strong><p>${escape(m.plot_code)} · ${escape(m.task_type)}<br>${escape(timestampLabel(m.created_at))}</p><p class="private-message">${escape(m.message)}</p></div>${!m.read_at?button('Mark read','read-message',m.message_id,'secondary small'):badge('Read','gray')}</article>`).join('')||empty('No staff messages yet.')}<h3>Task takeovers</h3>${flags.map(t=>`<div class="review-row"><div><h3>${escape(t.plot_code)} · ${escape(t.task_type)}</h3><p>${fmt(t.scheduled_date)}<br>${escape(t.substitute_staff)} accepted coverage${t.covered_for||t.assigned_staff_id!==t.substitute_staff_id?' for '+escape(t.covered_for||t.assigned_staff||'unassigned work'):''}.<br><strong>Reason:</strong> ${escape(t.takeover_reason)}</p></div>${button('Mark reviewed','review',t.task_id,'small')}</div>`).join('')||empty('No takeovers waiting for review.')}</div>`;
-  $('#modal').showModal();
+  const flags=state.tasks.filter(t=>t.is_flagged_for_admin),messages=state.messages||[],cover=state.tasks.filter(t=>needsCover(t,state.today));
+  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">Notifications</h2><button class="icon-button" data-action="close" aria-label="Close dialog">${icon('close')}</button></div><div class="notification-body"><h3>Tasks that need taking over</h3>${cover.map(t=>`<div class="review-row"><div><strong>${escape(t.plot_code)} · ${escape(t.task_type)}</strong><p>${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}<br>${escape(t.assigned_staff||'Unassigned')} needs cover. Staff were notified.</p></div>${button('Reassign','task-assignment',t.task_id,'secondary small')}</div>`).join('')||empty('No tasks need taking over.')}<h3>Staff messages</h3>${messages.map(m=>`<article class="review-row"><div><strong>${escape(m.full_name)}</strong><p>${escape(m.plot_code)} · ${escape(m.task_type)}<br>${escape(timestampLabel(m.created_at))}</p><p class="private-message">${escape(m.message)}</p></div>${!m.read_at?button('Mark read','read-message',m.message_id,'secondary small'):badge('Read','gray')}</article>`).join('')||empty('No staff messages yet.')}<h3>Task takeovers</h3>${flags.map(t=>`<div class="review-row"><div><h3>${escape(t.plot_code)} · ${escape(t.task_type)}</h3><p>${fmt(t.scheduled_date)}<br>${escape(t.substitute_staff)} accepted coverage${t.covered_for||t.assigned_staff_id!==t.substitute_staff_id?' for '+escape(t.covered_for||t.assigned_staff||'unassigned work'):''}.<br><strong>Reason:</strong> ${escape(t.takeover_reason)}</p></div>${button('Mark reviewed','review',t.task_id,'small')}</div>`).join('')||empty('No takeovers waiting for review.')}</div>`;
+  if(!$('#modal').open)$('#modal').showModal();
 }
 async function refresh() { state=await api('state');view=getView();shell(); }
 function navigate(target) {editingMap=false;mapPlacing=false;mapEditId=null;editingPlot=false;plotTab='overview';mapZoom=1;mapPan={x:0,y:0};history.pushState({},'',target);view=getView();search='';shell();$('#main').classList.add('view-enter');window.scrollTo(0,0);}
@@ -507,7 +594,8 @@ document.addEventListener('click',async event=>{
   const profileMenu=$('#profile-menu');
   if(profileMenu&&!event.target.closest('.profile-wrap')){profileMenu.hidden=true;$('.profile').setAttribute('aria-expanded','false');}
   const anchor=event.target.closest('a');
-  if(anchor?.dataset.taskDate){taskFilter=anchor.dataset.taskDate<state.today?'Overdue':'Open';staffFilter='all';}
+  if(anchor?.dataset.taskDate){taskFilter=anchor.dataset.taskDate<state.today?'Missed':'Open';staffFilter='all';}
+  if(anchor?.dataset.summary){taskFilter=anchor.dataset.summary;staffFilter='all';}
   if(anchor&&state&&!['/','/index.html','/login.html'].includes(anchor.pathname)&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&anchor.origin===location.origin) {event.preventDefault();$('#modal')?.close();navigate(anchor.getAttribute('href'));return;}
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id}=target.dataset;
@@ -530,6 +618,9 @@ document.addEventListener('click',async event=>{
     if(action==='history-token'){const input=$('#history-query');input.value+=(input.value?' ':'')+id+':';historyQuery=input.value;input.focus();renderHistoryResults();return;}
     if(action==='zone'){zone=id;filterMap();return;}
     if(action==='task-filter'){taskFilter=id;renderMain();return;}
+    if(action==='report-kind'){reportKind=id;reportOffset=0;renderMain();return;}
+    if(action==='report-step'){reportOffset=Math.min(0,reportOffset+Number(id));renderMain();return;}
+    if(action==='report-print'){window.print();return;}
     if(action==='stat-plots'){
       const stat=overviewPlots(state)[Number(id)];if(!stat)return;
       $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">${escape(stat.label)}</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="stat-plots">${stat.plots.map(p=>`<a href="plot-info.html?id=${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(p.zone)} →</span></a>`).join('')||empty('No plots in this category.')}</div>`;
@@ -567,13 +658,13 @@ setInterval(async()=>{
     const next=await api('state');if(state!==current||next.user.user_id!==current.user.user_id||editingMap||editingPlot)return;
     const previous=new Set(notificationKeys(state));
     const incoming=notificationKeys(next).filter(key=>!previous.has(key));
-    const changed=state.today!==next.today||JSON.stringify(state.tasks)!==JSON.stringify(next.tasks)||JSON.stringify(state.plots)!==JSON.stringify(next.plots)||JSON.stringify(state.cycles)!==JSON.stringify(next.cycles);
+    const changed=state.today!==next.today||JSON.stringify(state.tasks)!==JSON.stringify(next.tasks)||JSON.stringify(state.plots)!==JSON.stringify(next.plots)||JSON.stringify(state.cycles)!==JSON.stringify(next.cycles)||JSON.stringify(state.invites)!==JSON.stringify(next.invites);
     state=next;
     if(incoming.length) {
-      toast(isAdmin()?`${incoming.length} new garden notification${incoming.length===1?'':'s'}. Open the bell to review.`:'Your garden work has an update. Check your tasks and coverage requests.');
+      toast(isAdmin()?`${incoming.length} new garden notification${incoming.length===1?'':'s'}. Open the bell to review.`:'Your garden work has an update. Check your tasks and takeover requests.');
     }
     updateBell();
-    if(changed&&['dashboard','tasks','plots'].includes(view)&&!document.activeElement?.matches('input,select,textarea'))renderMain();
+    if(changed&&['dashboard','tasks','plots','reports'].includes(view)&&!document.activeElement?.matches('input,select,textarea'))renderMain();
   } catch(error) {if(state)toast('Could not refresh notifications. Check your connection.');}
   finally {polling=false;}
 },30000);

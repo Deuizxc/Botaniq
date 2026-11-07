@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapPosition, plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, calendarMonth, notificationKeys } from '../js/garden.js';
+import { mapPosition, plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, calendarMonth, notificationKeys, growthStage, plotOccupancy, taskWarnings, taskSummary, reportPeriod, staffReport } from '../js/garden.js';
 
 const plot={plot_id:1,plot_code:'GH-01'};
 const cycle={cycle_id:1,current_plot_id:1,origin_plot_id:1,crop_name:'Tomato',planted_date:'2026-01-01',harvest_date:'2026-02-01'};
@@ -112,4 +112,47 @@ test('plot layout uses saved bounds and clamps moves and all resize corners',()=
   assert.deepEqual(dragPlot([10,20,15,10],4,5,'se'),[10,20,19,15]);
   assert.deepEqual(dragPlot([10,20,15,10],100,100,'nw'),[22,27,3,3]);
   assert.deepEqual(dragPlot([10,20,15,10],100,100,'se'),[10,20,90,80]);
+});
+
+test('growth stage uses the planting stage first, then a placeholder age',()=>{
+  assert.deepEqual(growthStage({planted_date:'2026-10-15',planting_stage:'Seedling'},'2026-10-25'),{days:10,label:'Seedling'});
+  assert.equal(growthStage({planted_date:'2026-09-25'},'2026-10-25').label,'Full-grown plant');
+  assert.equal(growthStage({planted_date:'2026-10-24',planting_stage:'Fully grown plant'},'2026-10-25').label,'Full-grown plant');
+  assert.equal(plotOccupancy({occupancy_status:'Harvested'}),'Vacant');
+});
+test('scheduling warns about midday watering, vacant plots and seedling harvests',()=>{
+  const scene={today:'2026-10-25',plots:[{plot_id:1,plot_code:'A'},{plot_id:2,plot_code:'B'}],cycles:[{current_plot_id:1,crop_name:'Tomato',planted_date:'2026-10-20'}]};
+  const warn=(task_type,scheduled_time,plot_id)=>taskWarnings({task_type,scheduled_time,plot_id},scene).map(w=>w.title);
+  assert.match(warn('Manual watering','12:00','1')[0],/not advisable to water/);
+  assert.deepEqual(warn('Manual watering','08:00','1'),[]);
+  assert.deepEqual(warn('Manual watering','15:00','1'),[]);
+  assert.deepEqual(warn('General maintenance','12:00','2'),[]);
+  assert.match(warn('Manual watering','08:00','2')[0],/B is vacant/);
+  assert.match(warn('Harvest','08:00','1')[0],/still a seedling/);
+});
+test('task summary separates missed from ongoing work',()=>{
+  const tasks=[{status:'Pending',scheduled_date:'2026-10-24'},{status:'Missed',scheduled_date:'2026-10-10'},{status:'Pending',scheduled_date:'2026-10-25'},{status:'Pending',scheduled_date:'2026-10-26'},{status:'Completed',scheduled_date:'2026-10-24'}];
+  const {missed,ongoing,dueToday}=taskSummary(tasks,'2026-10-25');
+  assert.equal(missed.length,2);assert.equal(missed[0].scheduled_date,'2026-10-24');assert.equal(ongoing.length,2);assert.equal(dueToday,1);
+});
+test('report periods run Monday to Sunday and across month ends',()=>{
+  const week=reportPeriod('2026-11-07','Weekly');assert.deepEqual([week.from,week.to],['2026-11-02','2026-11-08']);
+  const sunday=reportPeriod('2026-11-08','Weekly');assert.equal(sunday.from,'2026-11-02');
+  const previous=reportPeriod('2026-11-07','Weekly',-1);assert.deepEqual([previous.from,previous.to],['2026-10-26','2026-11-01']);
+  const month=reportPeriod('2026-11-07','Monthly');assert.deepEqual([month.from,month.to,month.label],['2026-11-01','2026-11-30','November 2026']);
+  assert.equal(reportPeriod('2026-01-15','Monthly',-1).from,'2025-12-01');
+});
+test('staff report counts each outcome and credits taken-over work to the new owner',()=>{
+  const rows=[
+    {assigned_staff_id:2,status:'Completed',scheduled_date:'2026-11-03'},
+    {assigned_staff_id:2,status:'Missed',scheduled_date:'2026-11-04'},
+    {assigned_staff_id:2,status:'Pending',scheduled_date:'2026-11-05'},
+    {assigned_staff_id:2,status:'Pending',scheduled_date:'2026-11-09',covered_for_id:3},
+    {assigned_staff_id:2,status:'Completed',scheduled_date:'2026-10-30'},
+    {assigned_staff_id:3,status:'Pending',scheduled_date:'2026-11-06'}
+  ];
+  const report=staffReport(rows,2,{from:'2026-11-02',to:'2026-11-30'},'2026-11-07');
+  assert.deepEqual([report.assigned,report.completed,report.missed,report.ongoing,report.takenOver,report.rate],[4,1,2,1,1,33]);
+  assert.equal(staffReport(rows,3,{from:'2026-11-02',to:'2026-11-30'},'2026-11-07').handedOver,1);
+  assert.equal(staffReport([],2,{from:'2026-11-02',to:'2026-11-08'},'2026-11-07').rate,null);
 });

@@ -26,7 +26,7 @@ It supports two roles. **Admins** manage plots, crop cycles, tasks, and accounts
 * **Crop cycles**: Start, assign, transplant, and harvest crops. A nursery transplant is a single database transaction, and a partial unique index guarantees only one live crop per plot, even under concurrent requests.
 * **Task management**: Dated watering, fertilizer, hydroponic, harvest, and general maintenance tasks. Staff can take over a colleague's task with a required reason, which raises a review flag for admins. Watering tasks can be skipped or rescheduled for weather, with every change written to an audit log.
 * **Per-plot history**: Crop records, fertilizer applications, and snapshots of every admin save, searchable with tokens such as `crop:"String beans"`, `fertilizer:none`, and `before:2026-10-01`.
-* **Role-aware dashboards**: Staff see their unfinished tasks and a monthly calendar. Admins see daily staff progress and takeover reviews. Open sessions poll for updates every 30 seconds and announce new assignments with toasts.
+* **Role-aware dashboards**: Staff see their unfinished tasks and a monthly calendar. Admins see daily staff progress and takeover reviews. Open sessions poll for updates every 30 seconds and announce new assignments with toasts. Admins also get a printable weekly and monthly task report per staff member. Tasks left overdue for three days are kept as Missed so the reports stay complete.
 * **Manila-time scheduling**: The server always computes "today" in `Asia/Manila`, regardless of where it runs.
 
 ---

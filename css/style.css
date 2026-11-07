@@ -1,5 +1,7 @@
 :root {
-  font-family:Inter,"Segoe UI",Arial,sans-serif;
+  --display:Georgia,"Times New Roman",serif;
+  --body:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+  font-family:var(--body);
   color:#26392c;
   background:#f5f6f1;
   font-synthesis:none;
@@ -14,7 +16,7 @@
   box-sizing:border-box
 }
 body {
-  margin:1
+  margin:0
 }
 button,input,select,textarea {
   font:inherit
@@ -407,7 +409,7 @@ small {
 }
 .welcome h2 {
   font-size:25px;
-  font-family:Georgia,serif;
+  font-family:var(--display);
   font-weight:400;
   letter-spacing:-.5px;
   margin:8px 0 10px
@@ -1570,25 +1572,22 @@ dialog::backdrop {
 .university small {display:block;font-size:16px;margin-top:5px}
 .landing .btn {border-radius:4px;padding:16px 28px;font-size:16px;background:#53651b;color:#fff}
 .landing-intro {display:grid;grid-template-columns:1.2fr 1fr;gap:64px;align-items:center;padding-block:clamp(24px,3vw,40px)}
-.landing h1 {font:600 clamp(52px,6.7vw,100px)/1.02 Georgia,serif;letter-spacing:-.04em;color:var(--dark)}
-.landing-copy>p:first-child {font:400 clamp(24px,2.3vw,34px)/1.25 Georgia,serif;margin-bottom:22px}
+.landing h1 {font:600 clamp(52px,6.7vw,100px)/1.02 var(--display);letter-spacing:-.04em;color:var(--dark)}
+.landing-copy>p:first-child {font:400 clamp(24px,2.3vw,34px)/1.25 var(--display);margin-bottom:22px}
 .landing-copy>p {font-size:18px;line-height:1.65;max-width:40ch}
 .welcome-logo {display:block;width:min(100%,420px);height:auto}
 .landing-footer .brand img {width:160px;height:auto}
-.landing-photo {position:relative;margin:0;overflow:hidden}
-.landing-photo>img {display:block;width:100%;height:clamp(260px,42vh,440px);object-fit:cover;object-position:center 74%}
-.landing-photo figcaption {position:absolute;bottom:24px;left:clamp(24px,5vw,80px);padding:12px 18px;background:var(--dark);color:#fff;font-size:16px}
 .landing-footer {display:flex;align-items:center;justify-content:space-between;gap:24px;padding-block:24px}
-.landing-footer p {font:18px/1.5 Georgia,serif}
+.landing-footer p {font:18px/1.5 var(--display)}
 .landing-footer .brand {padding:0;color:var(--dark)}
 .login {display:grid;grid-template-columns:52.5fr 47.5fr;min-height:100svh;background:#fff;padding:0;gap:0}
 .login-form {position:relative;grid-column:2;grid-row:1;display:flex;align-items:center;justify-content:center;padding:80px 36px 36px;background:#fff}
 .login-box {width:100%;max-width:400px}
-.login-back {position:absolute;top:22px;left:22px;display:inline-flex;min-height:36px;align-items:center;padding:4px 12px;border:1px solid #53651b;border-radius:9px;font:600 16px Georgia,serif;color:#53651b}
+.login-back {position:absolute;top:22px;left:22px;display:inline-flex;min-height:36px;align-items:center;padding:4px 12px;border:1px solid #53651b;border-radius:9px;font:600 16px var(--display);color:#53651b}
 .login-seal {display:block;object-fit:cover;object-position:left;margin-bottom:20px}
 .login-box .brand {padding:0;color:var(--dark);margin-bottom:36px;font-size:34px}
-.login-box h1 {font:700 clamp(34px,3vw,48px)/1.15 Georgia,serif;text-align:center;letter-spacing:-.025em;margin-bottom:18px}
-.login-box>p {font:16px/1.6 Georgia,serif;text-align:center;color:#33583d;margin-bottom:28px}
+.login-box h1 {font:700 clamp(34px,3vw,48px)/1.15 var(--display);text-align:center;letter-spacing:-.025em;margin-bottom:18px}
+.login-box>p {font:16px/1.6 var(--display);text-align:center;color:#33583d;margin-bottom:28px}
 .login-box .field label {font-size:14px;color:var(--dark)}
 .login-box .field input {min-height:44px;background:#f0efe9;border-color:#53651b;font-size:16px;border-radius:6px}
 .login-box .btn {width:100%;min-height:44px;margin-top:24px;border-radius:6px;font-size:16px;background:#53651b}
@@ -1597,7 +1596,7 @@ dialog::backdrop {
 .login-background {position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .login-art:after {content:'';position:absolute;inset:0;background:#17371969}
 .login-photo-copy {position:absolute;bottom:60px;left:40px;right:40px;z-index:1;color:#fff;background:#1d352bc9;padding:24px}
-.login-photo-copy p {font:400 clamp(25px,2.4vw,36px)/1.15 Georgia,serif;margin-bottom:24px}
+.login-photo-copy p {font:400 clamp(25px,2.4vw,36px)/1.15 var(--display);margin-bottom:24px}
 .login-photo-copy span {font-size:16px}
 .btn,.landing-link {transition:transform .15s ease,opacity .15s ease}
 .btn:hover,.landing-link:hover {transform:translateY(-1px)}
@@ -1610,14 +1609,14 @@ dialog::backdrop {
   .landing-header {padding-block:16px;gap:14px}.university {gap:10px}.university img {width:44px;height:44px}.university strong {font-size:14px;max-width:130px}.university small {display:none}
   .landing .btn {font-size:14px;padding:12px 14px;white-space:nowrap}.landing .btn svg {display:none}
   .landing-intro {grid-template-columns:1fr;gap:28px;padding-block:38px}.landing h1 {font-size:58px}.landing-copy>p:first-child {font-size:26px;margin-bottom:16px}.landing-copy>p {font-size:16px}
-  .landing-photo>img {height:340px}.landing-photo figcaption {right:24px;bottom:20px;font-size:14px}.landing-footer {align-items:flex-start}.landing-footer p {max-width:145px}
+  .landing-scene {height:340px}.landing-footer {align-items:flex-start}.landing-footer p {max-width:145px}
   .login {display:flex;flex-direction:column;padding:0;gap:0}.login-form {padding:24px;min-height:100svh}.login-art {display:block;min-height:360px;border-radius:0}.login-box {max-width:400px}
   .login-background {display:block}.login-photo-copy p {display:block;font-size:30px}.login-photo-copy {left:24px;right:24px}
 }
 @media(prefers-reduced-motion:reduce) {*,*:before,*:after {animation:none!important;transition:none!important}}
 
 /* Four equal metric columns; the task queue and calendar share the same outer edges. */
-:root {font-family:"Segoe UI",Arial,sans-serif;--muted:#596653}
+:root {--muted:#596653}
 .main {max-width:1440px}
 .page-heading h1 {font-size:30px}
 .page-heading p {font-size:14px}
@@ -1749,21 +1748,21 @@ dialog::backdrop {
 .topbar>.icon-button:hover {background:#ffffff25}
 .topbar .profile {border-left:1px solid rgba(255,255,255,0.25)}
 .topbar .notification-dot {border-color:transparent}
-.topbar .profile strong {font:700 16px Georgia,serif}
+.topbar .profile strong {font:700 16px var(--display)}
 .topbar .profile small {font-size:13px}
 .brand-logo {display:block;width:100%;height:auto}
 .main {--page-gutter:clamp(24px,3vw,58px);max-width:none;padding:0 var(--page-gutter) 24px;min-height:calc(100svh - 84px);display:flex;flex-direction:column}
 .page-heading {position:relative;min-height:186px;margin:0 0 88px;padding:30px 0 38px;align-items:center}
-.page-heading h1 {font:700 clamp(34px,3.4vw,62px)/1.12 Georgia,serif;letter-spacing:-.025em;color:#fff;text-shadow:0 2px 3px #243b2b;-webkit-text-stroke:1px #53651b}
-.page-heading p {color:#fff;font:clamp(17px,1.5vw,26px)/1.5 Georgia,serif;text-shadow:0 1px 3px #243b2b}
+.page-heading h1 {font:700 clamp(34px,3.4vw,62px)/1.12 var(--display);letter-spacing:-.025em;color:#fff;text-shadow:0 2px 3px #243b2b;-webkit-text-stroke:1px #53651b}
+.page-heading p {color:#fff;font:clamp(17px,1.5vw,26px)/1.5 var(--display);text-shadow:0 1px 3px #243b2b}
 .heading-actions {position:absolute;right:0;top:calc(100% + 24px)}
 .overview-page .page-heading {margin-bottom:0;min-height:186px}
 .overview-page .heading-actions {position:static;align-self:flex-start}
 .care-stats {position:relative;gap:clamp(16px,2.4vw,44px);margin-bottom:42px}
 .care-stats .stat {background:#a0b18d;border:3px solid #465538;border-radius:30px;padding:24px;min-height:210px;display:flex;flex-direction:column;justify-content:space-between}
-.care-stats .stat-top {font:20px Georgia,serif;text-transform:uppercase;color:#35422e}
+.care-stats .stat-top {font:20px var(--display);text-transform:uppercase;color:#35422e}
 .care-stats .stat-value {font-size:48px;font-weight:650;color:#3e5033}
-.care-stats .stat-foot {font:14px Georgia,serif;text-transform:uppercase;color:#35422e}
+.care-stats .stat-foot {font:14px var(--display);text-transform:uppercase;color:#35422e}
 .care-grid {grid-template-columns:1.05fr 1fr;gap:36px}
 .footer {margin-top:auto;padding-top:40px}
 .main>.footer {margin-top:auto}
@@ -1788,7 +1787,7 @@ dialog::backdrop {
 .login-university small {font-size:14px}
 .login-brand {position:absolute;top:24%;left:12%;right:12%;z-index:1;text-align:center;color:#fff}
 .login-brand img {display:block;width:100%;height:auto}
-.login-brand p {font:700 20px Georgia,serif}
+.login-brand p {font:700 20px var(--display)}
 @media(max-width:1200px) {
   .atlas-layout.with-tasks {grid-template-columns:210px minmax(0,1fr)}
   .care-stats .stat {padding:20px;min-height:185px}.care-stats .stat-top {font-size:17px}
@@ -1844,7 +1843,7 @@ body {font-size:16px}
 .care-stats .stat {text-align:left;color:#23341c;background:#d9e3cf;cursor:pointer}
 .care-stats .stat-top {font-size:18px;color:#23341c;overflow-wrap:anywhere}
 .care-stats .stat-value,.care-stats .stat-foot {color:#23341c}
-.care-stats .stat-foot {font:600 14px "Segoe UI",sans-serif;text-transform:none}
+.care-stats .stat-foot {font:600 14px var(--body);text-transform:none}
 .stat:hover {background:#cbdcbd}
 button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3px}
 .stat-plots {padding:0 24px 24px;max-height:65vh;overflow:auto}
@@ -1882,12 +1881,12 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
 }
 .notification-count {
   position:absolute; top:-3px; right:-5px; min-width:18px; padding:1px 4px;
-  border-radius:12px; background:#a33725; color:white; font:bold 12px/16px sans-serif;
+  border-radius:12px; background:#a33725; color:white; font:bold 12px/16px var(--body);
   text-align:center; animation:coverage-ping 1.8s ease-out infinite;
 }
 @keyframes coverage-ping {
   from {box-shadow:0 0 0 0 rgba(163,55,37,.55)}
-  to {box-shadow:0 0 0 7px rgba(163,55,37,0)}
+  to {box-shadow:0 0 0 11px rgba(163,55,37,0)}
 }
 @media (prefers-reduced-motion:reduce) { .notification-count {animation:none} }
 
@@ -1910,7 +1909,100 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
     transition-duration: 60ms;
   }
 
-  .landing-photo > img {
-    animation-duration: 320ms;
-  }
+}
+
+/* Landing scene: one looping growth timelapse. Reduced motion shows the grown garden, because full size is the default state. */
+.landing-scene {margin:0;height:max(300px,min(37.5vw,64vh));overflow:hidden}
+.garden-scene {display:block;width:100%;height:100%;stroke:none;mask-image:linear-gradient(transparent,#000 14%)}
+.scene-soil {fill:#5b4632}
+.scene-plant {animation:scene-grow 24s cubic-bezier(.16,1,.3,1) -3.5s infinite}
+.scene-plant.d1 {animation-delay:-3s}.scene-plant.d2 {animation-delay:-2.5s}.scene-plant.d3 {animation-delay:-2s}.scene-plant.d4 {animation-delay:-1.5s}.scene-plant.d5 {animation-delay:-1s}
+.scene-sway {animation:scene-sway 3.6s ease-in-out infinite alternate}
+.scene-ripe {animation:scene-ripe 24s linear infinite backwards 1.2s}
+.scene-sun {transform-origin:720px 640px;animation:scene-sun 24s linear infinite}
+.scene-dusk {opacity:0;animation:scene-dusk 24s ease-in-out infinite}
+.scene-cloud {animation:scene-drift 38s ease-in-out infinite alternate}
+.scene-cloud.slow {animation-duration:56s;animation-direction:alternate-reverse}
+.scene-water path {fill:none;stroke:#8fc4dc;stroke-width:5;stroke-linecap:round;stroke-dasharray:1 16;animation:scene-spray 1.2s linear infinite}
+.scene-butterfly {offset-path:path("M200 300C360 220 420 380 620 300S900 220 1010 340 600 480 200 300");offset-rotate:0deg;animation:scene-flight 30s linear infinite}
+.scene-wings {animation:scene-flap .2s ease-in-out infinite alternate}
+@keyframes scene-grow {0% {transform:scale(0)}9%,26% {transform:scale(.4)}54%,93% {transform:scale(1)}100% {transform:scale(0)}}
+@keyframes scene-ripe {0%,54% {opacity:0}62%,92% {opacity:1}96%,100% {opacity:0}}
+@keyframes scene-sway {from {transform:rotate(-2.5deg)}to {transform:rotate(2.5deg)}}
+@keyframes scene-sun {from {transform:rotate(-38deg)}to {transform:rotate(38deg)}}
+@keyframes scene-dusk {0%,62% {opacity:0}88% {opacity:.32}100% {opacity:0}}
+@keyframes scene-drift {from {transform:translateX(-40px)}to {transform:translateX(260px)}}
+@keyframes scene-spray {to {stroke-dashoffset:-34}}
+@keyframes scene-flight {to {offset-distance:100%}}
+@keyframes scene-flap {from {transform:scaleX(1)}to {transform:scaleX(.3)}}
+
+/* Overview: takeover alert and task summary. */
+.cover-alert {display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:16px;background:#fff0b9;border:1px solid #c9a94a;border-radius:8px;color:#3c2f00}
+.cover-alert p {flex:1;min-width:0;font-size:14px}
+.cover-alert strong {display:block;font-size:16px}
+.task-summary {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:24px}
+.task-summary a {display:flex;align-items:center;gap:16px;padding:16px 20px;background:#fff;border-radius:8px;font-weight:600;color:var(--dark)}
+.task-summary a:hover {background:#f6f8f2}
+.task-summary strong {font:700 36px/1 var(--display);font-variant-numeric:tabular-nums}
+.task-summary [data-summary=Missed] strong {color:#a33725}
+.task-summary span {min-width:0;flex:1}
+.task-summary small {display:block;margin-top:2px;font-weight:400;color:#485440;overflow-wrap:anywhere}
+
+/* Plot details and scheduling guidance. */
+.plot-status-row {display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+.plot-status-row small {color:#485440}
+.task-hint {margin:0;padding:10px 12px;font-size:14px;line-height:1.5;color:#33452c;background:#edf2e7;border-radius:4px}
+.task-hint.wide {grid-column:1/-1}
+#confirm {padding:28px;width:min(460px,calc(100% - 32px))}
+#confirm h2 {font:700 21px/1.3 var(--display);letter-spacing:0;color:#8a2c1c;text-wrap:balance}
+#confirm p {margin-top:10px;line-height:1.55;color:#485440}
+#confirm h2+p+h2 {margin-top:20px}
+#confirm .confirm-question {margin-top:20px;font-weight:600;color:var(--dark)}
+#confirm .modal-actions {padding:0;margin-top:20px;border:0}
+
+/* Reports: the sheet on screen is the same sheet that prints. */
+.report-toolbar {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;padding:12px 20px;margin-bottom:24px;background:#fff;border-radius:8px}
+.report-toolbar .filters {background:none;padding:0}
+.report-step {display:flex;align-items:center;gap:8px}
+.report-step strong {font-size:16px;font-variant-numeric:tabular-nums;text-align:center}
+.report-step button {color:var(--dark);font-size:20px}
+.report-step button:disabled {cursor:not-allowed;opacity:.35}
+.report-paper {width:100%;max-width:900px;margin-inline:auto;padding:48px 52px;background:#fff;color:#1c2b1f;box-shadow:0 8px 30px #243b2b1f}
+.report-head {display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding-bottom:16px;margin-bottom:24px;border-bottom:2px solid var(--dark)}
+.report-head img {object-fit:contain}
+.report-head p {font-size:14px;color:#485440}
+.report-head h2 {font:700 28px/1.2 var(--display);letter-spacing:0;white-space:nowrap}
+.report-head dl {display:flex;flex-wrap:wrap;gap:4px 16px;margin:0 0 0 auto;font-size:14px}
+.report-head dl div {display:flex;gap:8px}
+.report-head dt {color:#485440}
+.report-head dd {margin:0;font-weight:600;white-space:nowrap}
+.report-paper h3 {margin-bottom:10px;font:700 18px/1.3 var(--display)}
+.report-table {width:100%;border-collapse:collapse;font-size:14px;white-space:normal;font-variant-numeric:tabular-nums}
+.report-table th,.report-table td {padding:8px 8px;text-align:left;vertical-align:top;color:#1c2b1f;background:none;border-bottom:1px solid #cfd6c6}
+.report-table thead th {font-weight:600;background:#edf2e7;border-bottom:1px solid #8b9a7e}
+.report-table .numeric {text-align:right}
+.report-table tfoot th,.report-table tfoot td {font-weight:700;border-top:2px solid #8b9a7e;border-bottom:0}
+.report-note {margin-top:10px;font-size:14px;color:#485440}
+.report-none {font-size:14px;color:#485440}
+.report-staff {margin-top:28px}
+.report-sign {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:48px;margin-top:56px}
+.report-sign span {display:block;min-height:28px;border-bottom:1px solid #1c2b1f;font-weight:600}
+.report-sign small {display:block;margin-top:6px;color:#485440}
+@media(max-width:700px) {
+  .task-summary {grid-template-columns:1fr}
+  .report-paper {padding:24px 16px}
+  .report-head dl {margin-left:0}
+  .report-sign {gap:24px}
+}
+@media print {
+  @page {size:A4;margin:14mm}
+  html,:root,body,.layout {background:#fff}
+  .sidebar,.topbar,.page-heading,.report-toolbar,.footer,#toast,dialog,.layout:before {display:none!important}
+  .layout {margin:0;min-height:0}
+  .main {display:block;padding:0;min-height:0}
+  .report-paper {max-width:none;padding:0;box-shadow:none}
+  .table-wrap {overflow:visible}
+  .report-table thead th {-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .report-table tr,.report-sign {break-inside:avoid}
+  .report-paper h3 {break-after:avoid}
 }

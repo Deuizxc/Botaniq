@@ -32,14 +32,71 @@ const localDate = value => value?.includes('T')
 
 export const assignedPending = (tasks, userId) => tasks.filter(t => t.status === 'Pending' && t.assigned_staff_id === userId);
 
+export const needsCover = (task, today) => Boolean(task.needs_cover) && task.status === 'Pending' && task.scheduled_date >= today;
+export const isMissed = (task, today) => task.status === 'Missed' || task.status === 'Pending' && task.scheduled_date < today;
+
+export function taskSummary(tasks, today) {
+  const missed = tasks.filter(t => isMissed(t, today)).sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date));
+  const ongoing = tasks.filter(t => t.status === 'Pending' && t.scheduled_date >= today);
+  return { missed, ongoing, dueToday: ongoing.filter(t => t.scheduled_date === today).length };
+}
+
+export function reportPeriod(today, kind, offset = 0) {
+  const day = new Date(`${today}T00:00:00Z`), iso = value => new Date(value).toISOString().slice(0, 10);
+  const short = value => new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  if (kind === 'Monthly') {
+    const year = day.getUTCFullYear(), month = day.getUTCMonth() + offset;
+    return { from: iso(Date.UTC(year, month, 1)), to: iso(Date.UTC(year, month + 1, 0)), label: new Date(Date.UTC(year, month, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }) };
+  }
+  const monday = day.getTime() + (7 * offset - (day.getUTCDay() + 6) % 7) * 86400000;
+  const from = iso(monday), to = iso(monday + 6 * 86400000);
+  return { from, to, label: `${short(from)} – ${short(to)}` };
+}
+
+export const reportStatus = (task, today) => isMissed(task, today) ? 'Missed' : task.status === 'Pending' ? 'Ongoing' : task.status;
+
+export function staffReport(tasks, staffId, { from, to }, today) {
+  const inPeriod = tasks.filter(t => t.scheduled_date >= from && t.scheduled_date <= to);
+  const rows = inPeriod.filter(t => t.assigned_staff_id === staffId);
+  const count = status => rows.filter(t => reportStatus(t, today) === status).length;
+  const completed = count('Completed'), missed = count('Missed'), skipped = count('Skipped'), due = completed + missed + skipped;
+  return {
+    rows, assigned: rows.length, completed, missed, skipped, ongoing: count('Ongoing'),
+    takenOver: rows.filter(t => t.covered_for_id).length,
+    handedOver: inPeriod.filter(t => t.covered_for_id === staffId).length,
+    rate: due ? Math.round(completed / due * 100) : null
+  };
+}
+
 export function notificationKeys(state) {
   return state.user.role === 'Admin'
-    ? [...state.tasks.filter(t=>t.is_flagged_for_admin).map(t=>`takeover-${t.task_id}`), ...(state.messages||[]).filter(m=>!m.read_at).map(m=>`message-${m.message_id}`)]
+    ? [...state.tasks.filter(t=>t.is_flagged_for_admin).map(t=>`takeover-${t.task_id}`), ...(state.messages||[]).filter(m=>!m.read_at).map(m=>`message-${m.message_id}`), ...state.tasks.filter(t=>needsCover(t,state.today)).map(t=>`cover-${t.task_id}`)]
     : [...assignedPending(state.tasks,state.user.user_id).map(t=>`task-${t.task_id}-${t.scheduled_date}-${t.scheduled_time}`), ...(state.invites||[]).map(i=>`invite-${i.invite_id}`)];
 }
 
 export const isGreenhouse = plot => plot.zone === 'Greenhouse' && !plot.parent_plot_id;
 export const isGrowingPlot = plot => !plot.removed_at && plot.zone !== 'Open space' && !isGreenhouse(plot);
+
+export const plotOccupancy = plot => plot.occupancy_status === 'Occupied' ? 'Occupied' : 'Vacant';
+
+// shortcut: 30 days is a demo placeholder, use per-crop maturity data when the catalog has it.
+export const SEEDLING_DAYS = 30;
+export function growthStage(cycle, today) {
+  const days = Math.max(0, Math.round((Date.parse(today) - Date.parse(cycle.planted_date)) / 86400000));
+  return { days, label: cycle.planting_stage === 'Fully grown plant' || days >= SEEDLING_DAYS ? 'Full-grown plant' : 'Seedling' };
+}
+
+export const liveCrop = (state, plotId) => state.cycles.find(c => c.current_plot_id === plotId && !c.harvest_date);
+
+// Midday is the app's advice window, shown to staff as "before 9 AM or after 4 PM".
+const midday = time => time >= '10:00' && time < '15:00';
+export function taskWarnings({ task_type, scheduled_time, plot_id }, state) {
+  const plot = state.plots.find(p => p.plot_id === Number(plot_id)), crop = plot && liveCrop(state, plot.plot_id), warnings = [];
+  if (task_type === 'Manual watering' && midday(scheduled_time)) warnings.push({ title: 'Warning: It’s not advisable to water the plant at this time', text: 'Midday heat dries the soil quickly and can stress the plant. Early morning or late afternoon is better.' });
+  if (['Manual watering', 'Fertilizer application', 'Hydroponic nutrients'].includes(task_type) && plot && !crop) warnings.push({ title: `Warning: ${plot.plot_code} is vacant`, text: 'Nothing is growing on this plot yet, so this care may not be needed.' });
+  if (task_type === 'Harvest' && crop && growthStage(crop, state.today).label === 'Seedling') warnings.push({ title: `Warning: ${crop.crop_name} is still a seedling`, text: `It was planted ${growthStage(crop, state.today).days} days ago and may not be ready to harvest.` });
+  return warnings;
+}
 
 export function taskDateLabel(scheduled, today) {
   const days = Math.round((Date.parse(today) - Date.parse(scheduled)) / 86400000);

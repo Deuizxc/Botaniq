@@ -49,7 +49,7 @@ test('authenticated state, role boundaries, and static files protect database re
   assert.ok(state.body.users.every(u=>!('password_hash' in u)));
   assert.equal((await request('/api/plots',{plot_code:'OP-99',zone:'Outdoor'},staff)).status,403);
   for(const path of ['/data/botaniq.sqlite','/schema.sql','/server.js','/.git/config']) assert.equal((await request(path)).status,404);
-  for(const path of ['/','/login.html','/edit-plot.html','/staff-dashboard.html','/css/style.css','/js/script.js','/js/garden.js','/img/testinglang.png','/img/qcu.png','/img/login_bg.png','/img/qculogo.png','/img/Logo.png','/img/landing_botaniq.png','/img/landing_welcomemsg.png','/img/landingpage_bg.png','/img/mainpage_bg.png']) assert.equal((await request(path)).status,200);
+  for(const path of ['/','/login.html','/edit-plot.html','/staff-dashboard.html','/reports.html','/css/style.css','/js/script.js','/js/garden.js','/img/testinglang.png','/img/qcu.png','/img/login_bg.png','/img/qculogo.png','/img/Logo.png','/img/landing_botaniq.png','/img/landing_welcomemsg.png','/img/mainpage_bg.png']) assert.equal((await request(path)).status,200);
 });
 test('staff messages stay private to admins, including through state and read endpoints',async t=>{
   const {request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com'),other=await login('andreifurton@gmail.com');
@@ -275,7 +275,7 @@ test('harvest tasks close only their original live crop atomically',async t=>{
   assert.ok(await db.get('SELECT cycle_id FROM crop_cycles WHERE current_plot_id=3 AND harvest_date IS NULL'));
 });
 
-test('three-day expiry deletes only pending work and its messages while retaining completed care',async t=>{
+test('three-day expiry marks pending work as missed and keeps it for reports',async t=>{
   const {db,request,login}=await fixture(t),admin=await login();
   await db.query("UPDATE maintenance_tasks SET scheduled_date='2026-10-16' WHERE task_id=1");
   await db.query("UPDATE maintenance_tasks SET scheduled_date='2026-10-17' WHERE task_id=2");
@@ -285,13 +285,13 @@ test('three-day expiry deletes only pending work and its messages while retainin
   const before=await db.get('SELECT COUNT(*)::int AS n FROM crop_cycles');
   const result=await request('/api/state',undefined,admin);
   assert.equal(result.status,200);
-  assert.ok(!result.body.tasks.some(t=>t.task_id===1));
-  assert.ok(result.body.tasks.some(t=>t.task_id===2));
+  assert.equal(result.body.tasks.find(t=>t.task_id===1).status,'Missed');
+  assert.equal(result.body.tasks.find(t=>t.task_id===2).status,'Pending');
   assert.ok(result.body.tasks.some(t=>t.task_id===3&&t.status==='Completed'));
-  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM task_messages WHERE task_id=1')).n,0);
-  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM task_adjustments WHERE task_id=1')).n,0);
+  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM task_messages WHERE task_id=1')).n,1);
+  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM task_adjustments WHERE task_id=1')).n,1);
   assert.deepEqual(await db.get('SELECT COUNT(*)::int AS n FROM crop_cycles'),before);
-  assert.equal((await request('/api/complete',{task_id:1},admin)).status,404);
+  assert.equal((await request('/api/complete',{task_id:1},admin)).status,409);
 });
 
 test('manual harvest and a staff harvest task cannot both close the same crop',async t=>{
@@ -409,4 +409,21 @@ test('plot photos require sign-in, allow only admin saves, and remain out of sta
   assert.equal((await request('/api/plot-entry',{...entry,photo_data:null,photo_version:1},admin)).status,200);
   assert.equal((await request('/api/plot-photo?id=2',undefined,admin)).status,404);
   assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM plot_entries WHERE plot_id=2')).n,3);
+});
+
+test('takeover moves the task out of the original queue, still open, and tells admin it needed cover',async t=>{
+  const {request,login}=await fixture(t),admin=await login(),owner=await login('andreifurton@gmail.com'),helper=await login('heavenashley@gmail.com');
+  assert.equal((await request('/api/request-cover',{task_id:3},owner)).status,200);
+  assert.equal((await request('/api/state',undefined,admin)).body.tasks.find(t=>t.task_id===3).needs_cover,true);
+  const [invite]=(await request('/api/state',undefined,helper)).body.invites;
+  assert.equal((await request('/api/takeover',{task_id:3,invite_id:invite.invite_id,takeover_reason:'Brent is away'},helper)).status,200);
+  assert.ok(!(await request('/api/state',undefined,owner)).body.tasks.some(t=>t.task_id===3));
+  const moved=(await request('/api/state',undefined,helper)).body.tasks.find(t=>t.task_id===3);
+  assert.equal(moved.status,'Pending');assert.equal(moved.completed_at,null);assert.equal(moved.needs_cover,false);
+});
+test('second demo admin signs in with admin rights',async t=>{
+  const {db,request,login}=await fixture(t),second=await login('admin2@gmail.com');
+  const {user}=(await request('/api/state',undefined,second)).body;
+  assert.equal(user.full_name,'CUAI Admin 2');assert.equal(user.role,'Admin');
+  assert.equal((await db.get("SELECT COUNT(*)::int AS n FROM schema_migrations WHERE name='009-reports-and-demo-admin'")).n,1);
 });

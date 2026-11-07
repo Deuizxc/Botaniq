@@ -143,7 +143,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage']) {
+  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
@@ -696,6 +696,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           '/plot-info.html',
           '/edit-plot.html',
           '/tasks.html',
+          '/reports.html',
           '/inventory.html',
           '/staff.html',
           '/archive.html',
@@ -711,7 +712,6 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           '/img/Logo.png': ['img/Logo.png', 'image/png'],
           '/img/landing_botaniq.png': ['img/landing_botaniq.png', 'image/png'],
           '/img/landing_welcomemsg.png': ['img/landing_welcomemsg.png', 'image/png'],
-          '/img/landingpage_bg.png': ['img/landingpage_bg.png', 'image/png'],
           '/img/mainpage_bg.png': ['img/mainpage_bg.png', 'image/png'],
           '/img/login_bg.png': ['img/login_bg.png', 'image/png'],
           '/img/favicon.png': ['img/favicon.png', 'image/png'] 
@@ -815,7 +815,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       if (!user) fail('Please sign in to continue.', 401);
 
       // shortcut: cleanup runs on authenticated requests; add a scheduled job if idle-time deletion is needed.
-      await baseDb.run("DELETE FROM maintenance_tasks WHERE status='Pending' AND scheduled_date<=?",shiftDays(today(),-3));
+      await baseDb.run("UPDATE maintenance_tasks SET status='Missed' WHERE status='Pending' AND scheduled_date<=?",shiftDays(today(),-3));
 
       if (path === '/api/logout' && req.method === 'POST') {
         await baseDb.run('DELETE FROM sessions WHERE token_hash=?', digest(token));
@@ -843,7 +843,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           baseDb.all(`SELECT user_id,full_name,role,active${isAdmin ? ',email' : ''} FROM users WHERE removed_at IS NULL ORDER BY full_name`),
           baseDb.all('SELECT d.*,c.planting_stage FROM cycle_details d JOIN crop_cycles c USING(cycle_id) ORDER BY d.planted_date DESC'),
           baseDb.all(
-            `SELECT t.*,p.plot_code,p.zone,u.full_name AS assigned_staff,s.full_name AS substitute_staff,prev.full_name AS covered_for FROM maintenance_tasks t JOIN plots p ON t.plot_id=p.plot_id LEFT JOIN users u ON t.assigned_staff_id=u.user_id LEFT JOIN users s ON t.substitute_staff_id=s.user_id LEFT JOIN users prev ON prev.user_id=t.covered_for_id WHERE (? OR t.assigned_staff_id=?) ORDER BY scheduled_date,scheduled_time`,isAdmin,user.user_id
+            `SELECT t.*,p.plot_code,p.zone,u.full_name AS assigned_staff,s.full_name AS substitute_staff,prev.full_name AS covered_for,EXISTS(SELECT 1 FROM coverage_invites i WHERE i.task_id=t.task_id) AS needs_cover FROM maintenance_tasks t JOIN plots p ON t.plot_id=p.plot_id LEFT JOIN users u ON t.assigned_staff_id=u.user_id LEFT JOIN users s ON t.substitute_staff_id=s.user_id LEFT JOIN users prev ON prev.user_id=t.covered_for_id WHERE (? OR t.assigned_staff_id=?) ORDER BY scheduled_date,scheduled_time`,isAdmin,user.user_id
           ),
           baseDb.all(
             'SELECT a.*,u.full_name FROM task_adjustments a JOIN users u ON a.staff_id=u.user_id JOIN maintenance_tasks t ON t.task_id=a.task_id WHERE (? OR t.assigned_staff_id=?) ORDER BY adjustment_id DESC',isAdmin,user.user_id
@@ -908,7 +908,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const password = await seedDemo(dbPool);
   if (password) {
     console.log(
-      `Demo accounts created. Password: ${password}\nAdmin: admin@gmail.com\nStaff: heavenashley@gmail.com, andreifurton@gmail.com, johntayag@gmail.com`
+      `Demo accounts created. Password: ${password}\nAdmin: admin@gmail.com, admin2@gmail.com\nStaff: heavenashley@gmail.com, andreifurton@gmail.com, johntayag@gmail.com`
     );
   }
   const port = Number(process.env.PORT || 3000);
