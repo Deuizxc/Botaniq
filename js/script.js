@@ -1,4 +1,4 @@
-import { plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, isGreenhouse, isGrowingPlot, calendarMonth, notificationKeys, needsCover, isMissed, taskSummary, reportPeriod, reportStatus, staffReport, plotOccupancy, growthStage, liveCrop, taskWarnings } from './garden.js';
+import { plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, isGreenhouse, isGrowingPlot, calendarMonth, notificationKeys, needsCover, isMissed, taskSummary, reportPeriod, reportStatus, staffReport, plotOccupancy, plotStatus, growthStage, liveCrop, taskWarnings } from './garden.js';
 const $ = selector => document.querySelector(selector);
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const paths = {
@@ -188,7 +188,12 @@ function gardenMap(compact=false) {
     <div class="map-caption"><span class="eyebrow">CUAI / Garden atlas</span><label class="map-picker"><span class="sr-only">Choose a plot</span><select id="map-picker"><option value="">Choose a plot…</option>${[...plots].sort((a,b)=>a.map_slot-b.map_slot).map(p=>`<option value="${p.plot_id}" ${selectedPlot()?.plot_id===p.plot_id?'selected':''}>${p.map_slot?`${p.map_slot} · `:''}${escape(p.plot_code)}</option>`).join('')}</select></label><span>${icon('sprout')} Tap a space. See what’s growing.</span></div>
     <div class="map-viewport"><svg class="map-svg" viewBox="0 0 1000 ${height}" aria-label="Garden plots. Drag or use arrow keys to move the map." role="group" tabindex="0">
       <defs><pattern id="map-grain" width="24" height="24" patternUnits="userSpaceOnUse"><rect x="2" y="2" width="2" height="2" fill="#a8b99b" opacity=".3"/></pattern>
-      <pattern id="bed-rows" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 6h12" stroke="#fff" opacity=".15" stroke-width="2"/></pattern></defs>
+      <pattern id="bed-rows" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M0 7h14" stroke="#3b2a18" opacity=".16" stroke-width="2"/></pattern>
+      <pattern id="house-ribs" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M13 0v26" stroke="#fff" opacity=".6" stroke-width="3.5"/></pattern>
+      <pattern id="nursery-trays" width="18" height="18" patternUnits="userSpaceOnUse"><rect x="2" y="2" width="14" height="14" fill="none" stroke="#2f4a25" opacity=".24" stroke-width="1.5"/></pattern>
+      <pattern id="paving" width="40" height="20" patternUnits="userSpaceOnUse"><path d="M0 .5h40M0 10.5h40M.5 0v10M20.5 10v10" stroke="#697162" opacity=".32" fill="none"/></pattern>
+      <g id="map-seedling"><path fill="#2f6b2c" d="M-1 0C-2-8-1-14 0-20 1-14 2-8 1 0Z"/><path fill="#3f8a35" d="M0-16C-10-16-17-22-18-32-8-33 0-26 0-16ZM0-20C8-20 14-26 15-34 6-35 0-29 0-20Z"/></g>
+      <g id="map-plant"><path fill="#2f6b2c" d="M0 0C-20-5-30-24-20-42-8-34-2-16 0 0Z"/><path fill="#3a7d30" d="M0 0C20-5 30-24 20-42 8-34 2-16 0 0Z"/><path fill="#4c9a3d" d="M0 0C-11-14-11-38 0-54 11-38 11-14 0 0Z"/></g></defs>
       <g class="map-world">
         <rect class="map-ground" x="0" y="0" width="1000" height="${height}" rx="28"/>
         <rect x="0" y="0" width="1000" height="${height}" fill="url(#map-grain)" rx="28"/>
@@ -199,26 +204,42 @@ function gardenMap(compact=false) {
         ${plots.map(mapPlotMarkup).join('')}
       </g>
     </svg></div>
-    <div class="map-bottom"><div class="map-key"><span class="indoor-key">Greenhouse — open to view beds</span><span class="outdoor-key">Outdoor beds</span><span class="nursery-key">Nursery</span><span class="space-key">Open space</span><span class="occupied-key">Solid = occupied</span><span class="vacant-key">Dashed = vacant</span><span class="task-key">! Your unfinished task</span></div><div class="map-controls"><button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button><button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
+    <div class="map-bottom"><div class="map-key"><span class="key-missed">Missed task</span><span class="key-care">Needs care today</span><span class="key-growing">Growing</span><span class="key-vacant">Vacant</span><span class="key-house">Greenhouse, open to view beds</span><span class="key-space">Open space</span><span class="key-icon"><svg viewBox="-20 -36 40 38" aria-hidden="true"><use href="#map-seedling"/></svg>Seedling</span><span class="key-icon"><svg viewBox="-30 -56 60 58" aria-hidden="true"><use href="#map-plant"/></svg>Full-grown</span></div><div class="map-controls"><button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button><button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
     ${house?`<div class="greenhouse-beds">${plots.map(p=>{const crop=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);return `<button class="greenhouse-bed" data-action="map-plot" data-id="${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(crop?`Occupied · ${crop.crop_name}${crop.variety?' · '+crop.variety:''} · ${growthStage(crop,state.today).label}`:'Vacant · Ready for planting')}</span></button>`;}).join('')||empty(isAdmin()?'No beds yet. Choose Edit map, then Add bed to lay out this greenhouse.':'No beds have been added yet.')}</div>`:''}
     ${compact?'':'<aside id="plot-inspector" class="plot-inspector" aria-label="Selected plot" hidden></aside>'}
   </section>`;
 }
+const plotStatusLabels={missed:'Missed task',care:'Needs care today',growing:'Growing',vacant:'Vacant',open:'Open space'};
+// Fills a bed with one plant per spot, leaving the label clear. Coordinates are in map units.
+function plotPlants(crop,[x,y,w,h],thin,hasCode) {
+  if(!crop)return '';
+  const left=x*10,top=y*7,width=w*10,height=h*7,size=thin?Math.min(28,height*.72):24,gap=size*1.35,scale=size/54;
+  const from=thin?left+(hasCode?120:62):left+10,span=left+width-(thin?24:10)-from,cols=Math.floor(span/gap);
+  if(cols<1)return '';
+  // Rows sit against the bed edges so the label keeps the middle clear.
+  const rows=thin?1:Math.min(6,Math.floor((height-12)/(size*1.2))),firstY=thin?top+height/2+size/2:top+size+6,rowGap=rows>1?(height-size-12)/(rows-1):0,labelTop=top+height/2-14,labelBottom=top+height/2+38,labelSide=width>220?95:width,icon=growthStage(crop,state.today).label==='Seedling'?'#map-seedling':'#map-plant',spots=[];
+  for(let row=0;row<rows;row++)for(let col=0;col<cols;col++) {
+    const px=from+(span-(cols-1)*gap)/2+col*gap,py=firstY+row*rowGap;
+    if(thin||py<labelTop||py-size>labelBottom||Math.abs(px-(left+width/2))>labelSide)spots.push(`<use href="${icon}" transform="translate(${px.toFixed(1)} ${py.toFixed(1)}) scale(${scale.toFixed(3)})"/>`);
+  }
+  return `<g class="plot-plants">${spots.join('')}</g>`;
+}
 function mapPlotMarkup(p) {
           const slot=p.map_slot||p.plot_id,[x,y,w,h]=plotBounds(p),c=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);
           const beds=activePlots().filter(b=>b.parent_plot_id===p.plot_id);
-          const caption=isGreenhouse(p)?`${beds.length} bed${beds.length===1?'':'s'}`:p.zone==='Open space'?'No planting':c?`${c.crop_name} · ${growthStage(c,state.today).label}`:'Vacant';
+          const stage=c&&growthStage(c,state.today).label,caption=isGreenhouse(p)?`${beds.length} bed${beds.length===1?'':'s'}`:p.zone==='Open space'?'No planting':c?`${c.crop_name} · ${stage}`:'Vacant';
+          const status=plotStatus(p,state),thin=h<14,hasCode=w>=17,shape=isGreenhouse(p)?'house':p.zone==='Open space'?'space':'bed';
+          const texture=isGreenhouse(p)?'house-ribs':p.zone==='Open space'?'paving':p.zone==='Nursery'?'nursery-trays':'bed-rows';
           const occupancy=isGreenhouse(p)?(beds.some(b=>b.occupancy_status==='Occupied')?'Occupied':'Vacant'):p.occupancy_status;
           const muted=!matchesPlot(p);
-          const assigned=assignedPending(state.tasks,state.user.user_id).some(t=>t.plot_id===p.plot_id||beds.some(b=>b.plot_id===t.plot_id));
-          return `<g class="map-plot ${p.zone.toLowerCase().replace(' ','-')} ${occupancy.toLowerCase()} ${muted?'dimmed':''}" data-action="map-plot" data-id="${p.plot_id}" role="button" tabindex="0" aria-pressed="${editingMap&&mapEditId===p.plot_id}" aria-label="Plot ${slot}, ${escape(p.plot_code)}, ${escape(caption)}">
-            <title>${escape(p.plot_code)} · ${escape(caption)} · ${p.zone}</title>
+          return `<g class="map-plot ${p.zone.toLowerCase().replace(' ','-')} ${occupancy.toLowerCase()} ${shape} status-${status} ${muted?'dimmed':''}" data-action="map-plot" data-id="${p.plot_id}" role="button" tabindex="0" aria-pressed="${editingMap&&mapEditId===p.plot_id}" aria-label="Plot ${slot}, ${escape(p.plot_code)}, ${escape(caption)}, ${plotStatusLabels[status]}">
+            <title>${escape(p.plot_code)} · ${escape(caption)} · ${p.zone} · ${plotStatusLabels[status]}</title>
             <rect class="plot-shape" x="${x*10}" y="${y*7}" width="${w*10}" height="${h*7}" rx="3"/>
-            <rect class="plot-texture" x="${x*10+4}" y="${y*7+4}" width="${w*10-8}" height="${h*7-8}" rx="5" fill="url(#bed-rows)"/>
-            <text class="map-plot-label" x="${(x+w/2)*10}" y="${(y+h/2)*7+5}">${slot}${w>=17?`<tspan class="map-plot-code"> · ${escape(p.plot_code)}</tspan>`:''}</text>
-            ${h>=14?`<text class="map-bed-caption" x="${(x+w/2)*10}" y="${(y+h/2)*7+28}">${escape(caption)}</text>`:''}
-            <rect class="plot-status" x="${(x+w)*10-14}" y="${y*7+6}" width="8" height="8"/>
-            ${assigned?`<g class="plot-task-alert" aria-label="You have unfinished tasks here"><rect x="${(x+w)*10-21}" y="${y*7-8}" width="26" height="26"/><text x="${(x+w)*10-8}" y="${y*7+10}">!</text></g>`:''}
+            <rect class="plot-texture" x="${x*10+4}" y="${y*7+4}" width="${w*10-8}" height="${h*7-8}" rx="5" fill="url(#${texture})"/>
+            ${plotPlants(c,[x,y,w,h],thin,hasCode)}
+            <text class="map-plot-label ${thin?'thin':''}" x="${thin?x*10+12:(x+w/2)*10}" y="${(y+h/2)*7+(thin?7:5)}">${slot}${hasCode?`<tspan class="map-plot-code"> · ${escape(p.plot_code)}</tspan>`:''}</text>
+            ${h>=14?`<text class="map-bed-caption" x="${(x+w/2)*10}" y="${(y+h/2)*7+28}">${escape(w<16&&c?c.crop_name:caption)}</text>`:''}
+            ${status==='care'||status==='missed'?`<g class="plot-task-alert"><rect x="${(x+w)*10-21}" y="${y*7-8}" width="26" height="26"/><text x="${(x+w)*10-8}" y="${y*7+10}">!</text></g>`:''}
             ${editingMap&&mapEditId===p.plot_id?['nw','ne','sw','se'].map(corner=>`<rect class="plot-handle ${corner}" data-corner="${corner}" x="${(x+(corner.includes('e')?w:0))*10-8}" y="${(y+(corner.includes('s')?h:0))*7-8}" width="16" height="16" rx="3" role="button" tabindex="0" aria-label="Resize ${corner} corner of ${escape(p.plot_code)} with arrow keys"/>`).join(''):''}
           </g>`;
 }

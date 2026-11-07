@@ -1460,27 +1460,13 @@ dialog::backdrop {
 .map-compass text {font-size:14px;text-anchor:middle}
 .map-plot {cursor:pointer;outline:none;transition:opacity .2s}
 .map-plot.dimmed {opacity:.22}
-.plot-shape {fill:#68865d;stroke:#54764e;stroke-width:2;filter:drop-shadow(0 4px 1px #455a3520);transition:fill .2s,stroke .2s}
-.map-plot.outdoor .plot-shape {fill:#ad8a63;stroke:#9e7c56}
-.map-plot.nursery .plot-shape {fill:#8ba566;stroke:#7f985b}
-.map-plot.vacant .plot-shape {fill:#cbd8bd;stroke:#8aa077;stroke-dasharray:6 4}
-.map-plot.outdoor.vacant .plot-shape {fill:#dfd2ba;stroke:#ad946f}
-.map-plot:hover .plot-shape,.map-plot:focus-visible .plot-shape {stroke:#253f2a;stroke-width:4;filter:drop-shadow(0 5px 3px #455a3540)}
-.map-plot[aria-pressed=true] .plot-shape {stroke:#fff;stroke-width:5;filter:drop-shadow(0 0 6px #33583d80)}
 .map-plot-label {fill:#fff;stroke:none;font-size:16px;font-weight:650;text-anchor:middle;pointer-events:none}
 .map-plot-code {font-size:14px;font-weight:450}
-.map-plot.vacant .map-plot-label {fill:#40563a}
-.plot-texture,.plot-status {pointer-events:none}
-.plot-status {fill:#dbe8ae;stroke:#ffffffa0;stroke-width:1}
-.map-plot.vacant .plot-status {fill:#f8faef}
-.map-plot.harvested .plot-status {fill:#f2cf7c}
+.plot-texture,.plot-plants {pointer-events:none}
 .map-site-label {font-size:14px;letter-spacing:3px;fill:#849675;stroke:none}
 .map-bottom {padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:#fff}
 .map-key {display:flex;flex-wrap:wrap;gap:12px;font-size:14px;color:#76856d}
 .map-key span:before {content:'';display:inline-block;width:10px;height:8px;border-radius:3px;background:#68865d;margin-right:5px}
-.map-key .outdoor-key:before {background:#ad8a63}
-.map-key .nursery-key:before {background:#8ba566}
-.map-key .vacant-key:before {background:transparent;border:1px dashed #8aa077}
 .garden-map.compact {border:0;border-radius:0}
 .compact .map-viewport {height:400px}
 .compact .map-caption {padding:14px 22px}
@@ -1557,11 +1543,15 @@ dialog::backdrop {
 .boot {min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#f5f6f1;color:var(--dark);font-size:20px}
 .boot span {font-size:14px;color:#596653}
 .growing-plant {width:110px;height:140px;stroke:var(--green);stroke-width:3;fill:none}
-.plant-stem {stroke-dasharray:90;stroke-dashoffset:0;animation:stem-grow .5s ease-out both}
-.plant-leaf {transform-box:fill-box;transform-origin:bottom center;animation:leaf-grow .4s ease-out both}
-.leaf-one {animation-delay:.2s}.leaf-two {animation-delay:.35s}.leaf-three {animation-delay:.5s}.leaf-four {animation-delay:.65s}
-@keyframes stem-grow {from {stroke-dashoffset:90}}
-@keyframes leaf-grow {from {transform:scale(0);opacity:0}to {transform:scale(1);opacity:1}}
+.plant-stem {stroke-dasharray:90;stroke-dashoffset:0;animation:stem-grow 2.8s ease-out infinite}
+.plant-leaf {transform-box:fill-box;transform-origin:bottom center}
+/* One shared 2.8s cycle: grown by 1s (the landing shows the loader that long), held, then it fades and regrows. */
+.leaf-one {animation:leaf-one 2.8s ease-out infinite}.leaf-two {animation:leaf-two 2.8s ease-out infinite}.leaf-three {animation:leaf-three 2.8s ease-out infinite}.leaf-four {animation:leaf-four 2.8s ease-out infinite}
+@keyframes stem-grow {0% {stroke-dashoffset:90;opacity:1}14%,84% {stroke-dashoffset:0;opacity:1}94%,100% {stroke-dashoffset:0;opacity:0}}
+@keyframes leaf-one {0%,6% {transform:scale(0);opacity:0}16%,84% {transform:scale(1);opacity:1}94%,100% {transform:scale(1);opacity:0}}
+@keyframes leaf-two {0%,12% {transform:scale(0);opacity:0}22%,84% {transform:scale(1);opacity:1}94%,100% {transform:scale(1);opacity:0}}
+@keyframes leaf-three {0%,18% {transform:scale(0);opacity:0}29%,84% {transform:scale(1);opacity:1}94%,100% {transform:scale(1);opacity:0}}
+@keyframes leaf-four {0%,24% {transform:scale(0);opacity:0}36%,84% {transform:scale(1);opacity:1}94%,100% {transform:scale(1);opacity:0}}
 .landing {background:#f5f6f1;color:var(--dark)}
 .landing-header,.landing-intro,.landing-footer {padding-inline:clamp(24px,5vw,80px)}
 .landing-header {display:flex;align-items:center;justify-content:space-between;gap:24px;padding-block:16px}
@@ -1853,20 +1843,12 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
 .team-progress {width:120px;flex-shrink:0;text-align:right}
 .team-progress progress {display:block;width:100%;height:12px;accent-color:#315739}
 .team-progress small {display:block;font-size:14px;color:#485440;margin-top:6px}
-.plot-shape {fill:#adc59f}
-.map-plot.outdoor .plot-shape {fill:#d3b48f}
-.map-plot.nursery .plot-shape {fill:#b9ce91}
 .map-plot-label {font-size:21px;font-weight:700;fill:#14230f}
 .map-plot-code {font-size:16px;font-weight:600}
 .map-bed-caption {font-size:17px;font-weight:600;fill:#14230f;text-anchor:middle;pointer-events:none}
-.map-plot.vacant .map-plot-label {fill:#14230f}
-.map-plot[aria-pressed=true] .plot-shape {stroke:#1b3423;stroke-width:4}
-.map-plot.open-space .plot-shape {fill:#e6e7df;stroke:#697162;stroke-dasharray:none}
-.map-plot.open-space .plot-texture,.map-plot.open-space .plot-status {display:none}
-.plot-task-alert rect {fill:#fff0b9;stroke:#684b00;stroke-width:2}
 .map-key,.map-caption>span:last-child {font-size:14px;color:#36472c}
-.map-key .space-key:before {background:#e6e7df;border:1px solid #697162}
-.map-key span:before {border-radius:0}
+.map-key span {display:inline-flex;align-items:center}
+.map-key span:before {border-radius:2px;width:12px;height:12px;margin-right:6px}
 .greenhouse-beds {display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;padding:18px;border-top:1px solid var(--line)}
 .greenhouse-bed {text-align:left;padding:14px;background:#edf2e7;border:1px solid #a5b798;border-radius:4px;color:#23341c;min-height:64px;font-size:16px;overflow-wrap:anywhere}
 .greenhouse-bed span {display:block;margin-top:6px;font-size:14px}
@@ -1910,6 +1892,30 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
   }
 
 }
+
+/* Map: colour says what needs attention, shape and texture say what kind of space it is. */
+.plot-shape {fill:#cdb594;stroke:#8d8f77;stroke-width:4.5;stroke-dasharray:15 3;filter:drop-shadow(0 3px 2px #455a3530);transition:fill .2s,stroke .2s}
+.map-plot.status-growing .plot-shape {fill:#a5cf80}
+.map-plot.status-care .plot-shape {fill:#f4c751}
+.map-plot.status-missed .plot-shape {fill:#e8806a}
+.map-plot.house .plot-shape {stroke:#6f8870;stroke-dasharray:none}
+.map-plot.space .plot-shape {stroke:#8b9085;stroke-width:3;stroke-dasharray:none}
+.map-plot.space.status-open .plot-shape {fill:#e6e7df}
+.map-plot:hover .plot-shape,.map-plot:focus-visible .plot-shape {stroke:#253f2a;stroke-dasharray:none;filter:drop-shadow(0 5px 3px #455a3540)}
+.map-plot[aria-pressed=true] .plot-shape {stroke:#1b3423;stroke-dasharray:none}
+.map-plot-label.thin {text-anchor:start}
+.plot-plants {stroke:none}
+.plot-task-alert rect {fill:#f4c751;stroke:#5b4300;stroke-width:2}
+.map-plot.status-missed .plot-task-alert rect {fill:#a33725;stroke:#fff}
+.map-plot.status-missed .plot-task-alert text {fill:#fff}
+.map-key .key-missed:before {background:#e8806a}
+.map-key .key-care:before {background:#f4c751}
+.map-key .key-growing:before {background:#a5cf80}
+.map-key .key-vacant:before {background:#cdb594}
+.map-key .key-house:before {background:repeating-linear-gradient(90deg,#fff 0 2px,#a5cf80 2px 5px);border:1px solid #6f8870}
+.map-key .key-space:before {background:#e6e7df;border:1px solid #8b9085}
+.map-key .key-icon:before {display:none}
+.map-key .key-icon svg {width:16px;height:16px;margin-right:4px;stroke:none}
 
 /* Landing scene: one looping growth timelapse. Reduced motion shows the grown garden, because full size is the default state. */
 .landing-scene {margin:0;height:max(300px,min(37.5vw,64vh));overflow:hidden}

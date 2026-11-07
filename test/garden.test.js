@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapPosition, plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, calendarMonth, notificationKeys, growthStage, plotOccupancy, taskWarnings, taskSummary, reportPeriod, staffReport } from '../js/garden.js';
+import { mapPosition, plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, calendarMonth, notificationKeys, growthStage, plotOccupancy, plotStatus, taskWarnings, taskSummary, reportPeriod, staffReport } from '../js/garden.js';
 
 const plot={plot_id:1,plot_code:'GH-01'};
 const cycle={cycle_id:1,current_plot_id:1,origin_plot_id:1,crop_name:'Tomato',planted_date:'2026-01-01',harvest_date:'2026-02-01'};
@@ -129,6 +129,17 @@ test('scheduling warns about midday watering, vacant plots and seedling harvests
   assert.deepEqual(warn('General maintenance','12:00','2'),[]);
   assert.match(warn('Manual watering','08:00','2')[0],/B is vacant/);
   assert.match(warn('Harvest','08:00','1')[0],/still a seedling/);
+});
+test('plot status puts open work first and rolls greenhouse beds up',()=>{
+  const house={plot_id:1,zone:'Greenhouse',occupancy_status:'Vacant'},bed={plot_id:2,zone:'Greenhouse',parent_plot_id:1,occupancy_status:'Occupied'},open={plot_id:3,zone:'Open space',occupancy_status:'Vacant'},empty={plot_id:4,zone:'Outdoor',occupancy_status:'Harvested'};
+  const scene=tasks=>({today:'2026-10-25',plots:[house,bed,open,empty],tasks});
+  assert.equal(plotStatus(house,scene([])),'growing');
+  assert.equal(plotStatus(open,scene([])),'open');
+  assert.equal(plotStatus(empty,scene([])),'vacant');
+  assert.equal(plotStatus(house,scene([{plot_id:2,status:'Pending',scheduled_date:'2026-10-25'}])),'care');
+  assert.equal(plotStatus(bed,scene([{plot_id:2,status:'Pending',scheduled_date:'2026-10-25'},{plot_id:2,status:'Pending',scheduled_date:'2026-10-24'}])),'missed');
+  assert.equal(plotStatus(bed,scene([{plot_id:2,status:'Pending',scheduled_date:'2026-10-26'}])),'growing');
+  assert.equal(plotStatus(bed,scene([{plot_id:2,status:'Missed',scheduled_date:'2026-10-20'}])),'growing');
 });
 test('task summary separates missed from ongoing work',()=>{
   const tasks=[{status:'Pending',scheduled_date:'2026-10-24'},{status:'Missed',scheduled_date:'2026-10-10'},{status:'Pending',scheduled_date:'2026-10-25'},{status:'Pending',scheduled_date:'2026-10-26'},{status:'Completed',scheduled_date:'2026-10-24'}];

@@ -79,6 +79,17 @@ export const isGrowingPlot = plot => !plot.removed_at && plot.zone !== 'Open spa
 
 export const plotOccupancy = plot => plot.occupancy_status === 'Occupied' ? 'Occupied' : 'Vacant';
 
+// Closed Missed tasks are history for reports, so only open work colours a plot and red clears itself.
+export function plotStatus(plot, state) {
+  const beds = state.plots.filter(bed => bed.parent_plot_id === plot.plot_id && !bed.removed_at);
+  const ids = new Set([plot.plot_id, ...beds.map(bed => bed.plot_id)]);
+  const open = state.tasks.filter(t => t.status === 'Pending' && ids.has(t.plot_id));
+  if (open.some(t => t.scheduled_date < state.today)) return 'missed';
+  if (open.some(t => t.scheduled_date === state.today)) return 'care';
+  if (plot.zone === 'Open space') return 'open';
+  return [plot, ...beds].some(p => p.occupancy_status === 'Occupied') ? 'growing' : 'vacant';
+}
+
 // shortcut: 30 days is a demo placeholder, use per-crop maturity data when the catalog has it.
 export const SEEDLING_DAYS = 30;
 export function growthStage(cycle, today) {
