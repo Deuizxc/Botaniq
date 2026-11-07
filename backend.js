@@ -788,18 +788,21 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           const expires = now + 15 * 60 * 1000;
           await tx.run('DELETE FROM login_failures WHERE expires_at<=?',now);
           const attempt = await tx.get(`INSERT INTO login_failures(client_key,expires_at) VALUES(?,?)
-            ON CONFLICT(client_key) DO UPDATE SET client_key=EXCLUDED.client_key RETURNING failures`,key,expires);
-          if (attempt.failures >= 3) return { locked: true };
+            ON CONFLICT(client_key) DO UPDATE SET client_key=EXCLUDED.client_key RETURNING failures,expires_at`,key,expires);
+          if (attempt.failures >= 3) return { locked: Number(attempt.expires_at) };
           const account = await tx.get('SELECT * FROM users WHERE email=? AND active=1',email);
           if (!account || !verifyPassword(password,account.password_hash)) {
             await tx.run(`UPDATE login_failures SET failures=failures+1,
               expires_at=CASE WHEN failures=2 THEN ? ELSE expires_at END WHERE client_key=?`,expires,key);
-            return { locked: attempt.failures === 2 };
+            return { locked: attempt.failures === 2 && expires };
           }
           await tx.run('DELETE FROM login_failures WHERE client_key=?',key);
           return { account };
         });
-        if (result.locked) fail('Too many sign-in attempts. Try again in 15 minutes.',429);
+        if (result.locked) {
+          const mins = Math.max(1, Math.ceil((result.locked - Date.now()) / 60000));
+          fail(`Too many sign-in attempts. Try again in ${mins} minute${mins === 1 ? '' : 's'}.`,429);
+        }
         if (!result.account) fail('Email or password is incorrect.',401);
         const account = result.account;
 
