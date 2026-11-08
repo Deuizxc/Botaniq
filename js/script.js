@@ -110,7 +110,7 @@ function renderLanding() {
 function renderLogin() {
   $('#modal').close();document.title='BotaniQ · Log in';
   $('#app').innerHTML=`<main class="login"><section class="login-form"><div class="login-box"><a class="login-back" href="/">← Back</a><h1>Welcome!</h1><p>Log in to check your tasks and manage your plots</p><form id="login-form">${field('Email address','email','email','','required autocomplete="username" placeholder="Your email address"')}${field('Password','password','password','','required autocomplete="current-password" maxlength="128"')}<div class="form-error" role="alert"></div><button class="btn" type="submit">Log in</button></form><p class="login-foot">New here? Approach an admin for a staff account.</p></div></section><section class="login-art" aria-label="The QCU campus garden"><img class="login-background" src="/img/login_bg.png" alt="QCU campus gardens and greenhouses" width="778" height="825"><a class="university login-university" href="/"><img src="/img/qculogo.png" alt="Quezon City University seal"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><div class="login-brand"><img src="/img/Logo.png" alt="BotaniQ"><p>Assign · Track · Schedule</p></div><div class="login-photo-copy"><p>Good care today.<br>A greener campus tomorrow.</p><span>Quezon City University</span></div></section></main>`;
-  $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,submit=form.querySelector('button');submit.disabled=true;try{await api('login',Object.fromEntries(new FormData(form)));history.replaceState({},'','index.html');await refresh();history.replaceState({},'',href('dashboard'));toast('Welcome back. Your garden is ready.');loginPopup();}catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}});
+  $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,submit=form.querySelector('button');submit.disabled=true;try{await api('login',Object.fromEntries(new FormData(form)));history.replaceState({},'','index.html');await refresh();history.replaceState({},'',href('dashboard'));toast('Welcome back. Your garden is ready.');sessionStorage.setItem('botaniq-greeted','1');loginPopup();}catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}});
 }
 function shell() {
   const links=[['dashboard','grid'],['tasks','tasks'],['plots','sprout'],['inventory','leaf'],...(isAdmin()?[['reports','report'],['staff','users']]:[])];
@@ -599,7 +599,7 @@ function loginPopup() {
   if(isAdmin())return;
   const tasks=assignedPending(state.tasks,state.user.user_id);
   if(!tasks.length)return;
-  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">You have ${tasks.length} task${tasks.length===1?'':'s'} to do</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="notification-body">${taskRows(tasks.slice(0,5))}${tasks.length>5?`<p class="queue-more">${tasks.length-5} more in Maintenance tasks.</p>`:''}${button('View my tasks','my-tasks','','small')}</div>`;
+  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">Notifications</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="notification-body"><h3>You have ${tasks.length} task${tasks.length===1?'':'s'} to do</h3>${taskRows(tasks.slice(0,5))}${tasks.length>5?`<p class="queue-more">${tasks.length-5} more in Maintenance tasks.</p>`:''}${button('View my tasks','my-tasks','','small')}</div>`;
   $('#modal').showModal();markTasksSeen();
 }
 function updateBell() {
@@ -613,7 +613,7 @@ function notifications() {
   if(!isAdmin()) {
     const dialog=$('#modal');
     dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">Notifications</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div>
-      <div class="notification-body">${newTasks().length?`<h3>Newly assigned tasks</h3>${taskRows(newTasks())}<h3>Takeover requests</h3>`:''}${(state.invites||[]).map(i=>`<article class="review-row"><div><strong>${escape(i.task_type)} · ${escape(i.plot_code)}</strong><p>${fmt(i.scheduled_date)} · ${clock(i.scheduled_time)}</p>
+      <div class="notification-body">${newTasks().length?`<h3>Newly assigned tasks</h3>${taskRows(newTasks())}${(state.invites||[]).length?'<h3>Takeover requests</h3>':''}`:''}${(state.invites||[]).map(i=>`<article class="review-row"><div><strong>${escape(i.task_type)} · ${escape(i.plot_code)}</strong><p>${fmt(i.scheduled_date)} · ${clock(i.scheduled_time)}</p>
       ${button('Take over','takeover',i.invite_id,'small')} ${i.is_read?badge('Read','gray'):button('Mark read','read-invite',i.invite_id,'secondary small')}</div></article>`).join('')||empty('No tasks need taking over.')}</div>`;
     if(!dialog.open)dialog.showModal();markTasksSeen();return;
   }
@@ -679,7 +679,7 @@ const landingRoute=['/','/index.html'].includes(location.pathname);
 try {
   const [loaded]=await Promise.all([api('state').catch(error=>{if(error.message!=='Please sign in to continue.')toast(error.message);return null;}),new Promise(resolve=>setTimeout(resolve,landingRoute&&!matchMedia('(prefers-reduced-motion: reduce)').matches?1000:0))]);
   state=loaded;
-  if(landingRoute)renderLanding();else if(state){view=getView();shell();}else renderLogin();
+  if(landingRoute)renderLanding();else if(state){view=getView();shell();if(!sessionStorage.getItem('botaniq-greeted')){sessionStorage.setItem('botaniq-greeted','1');loginPopup();}}else renderLogin();
 } catch(error){renderLogin();toast(error.message);}
 
 let polling=false;
