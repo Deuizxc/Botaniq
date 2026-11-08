@@ -846,7 +846,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           baseDb.all(`SELECT user_id,full_name,role,active${isAdmin ? ',email' : ''} FROM users WHERE removed_at IS NULL ORDER BY full_name`),
           baseDb.all('SELECT d.*,c.planting_stage FROM cycle_details d JOIN crop_cycles c USING(cycle_id) ORDER BY d.planted_date DESC'),
           baseDb.all(
-            `SELECT t.*,p.plot_code,p.zone,u.full_name AS assigned_staff,s.full_name AS substitute_staff,prev.full_name AS covered_for,EXISTS(SELECT 1 FROM coverage_invites i WHERE i.task_id=t.task_id) AS needs_cover FROM maintenance_tasks t JOIN plots p ON t.plot_id=p.plot_id LEFT JOIN users u ON t.assigned_staff_id=u.user_id LEFT JOIN users s ON t.substitute_staff_id=s.user_id LEFT JOIN users prev ON prev.user_id=t.covered_for_id WHERE (? OR t.assigned_staff_id=?) ORDER BY scheduled_date,scheduled_time`,isAdmin,user.user_id
+            `SELECT t.*,p.plot_code,p.zone,u.full_name AS assigned_staff,s.full_name AS substitute_staff,prev.full_name AS covered_for,EXISTS(SELECT 1 FROM coverage_invites i WHERE i.task_id=t.task_id) AS needs_cover FROM maintenance_tasks t JOIN plots p ON t.plot_id=p.plot_id LEFT JOIN users u ON t.assigned_staff_id=u.user_id LEFT JOIN users s ON t.substitute_staff_id=s.user_id LEFT JOIN users prev ON prev.user_id=t.covered_for_id WHERE (? OR t.assigned_staff_id=?) ORDER BY scheduled_date DESC,scheduled_time DESC`,isAdmin,user.user_id
           ),
           baseDb.all(
             'SELECT a.*,u.full_name FROM task_adjustments a JOIN users u ON a.staff_id=u.user_id JOIN maintenance_tasks t ON t.task_id=a.task_id WHERE (? OR t.assigned_staff_id=?) ORDER BY adjustment_id DESC',isAdmin,user.user_id

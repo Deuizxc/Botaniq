@@ -110,7 +110,7 @@ function renderLanding() {
 function renderLogin() {
   $('#modal').close();document.title='BotaniQ · Log in';
   $('#app').innerHTML=`<main class="login"><section class="login-form"><div class="login-box"><a class="login-back" href="/">← Back</a><h1>Welcome!</h1><p>Log in to check your tasks and manage your plots</p><form id="login-form">${field('Email address','email','email','','required autocomplete="username" placeholder="Your email address"')}${field('Password','password','password','','required autocomplete="current-password" maxlength="128"')}<div class="form-error" role="alert"></div><button class="btn" type="submit">Log in</button></form><p class="login-foot">New here? Approach an admin for a staff account.</p></div></section><section class="login-art" aria-label="The QCU campus garden"><img class="login-background" src="/img/login_bg.png" alt="QCU campus gardens and greenhouses" width="778" height="825"><a class="university login-university" href="/"><img src="/img/qculogo.png" alt="Quezon City University seal"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><div class="login-brand"><img src="/img/Logo.png" alt="BotaniQ"><p>Assign · Track · Schedule</p></div><div class="login-photo-copy"><p>Good care today.<br>A greener campus tomorrow.</p><span>Quezon City University</span></div></section></main>`;
-  $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,submit=form.querySelector('button');submit.disabled=true;try{await api('login',Object.fromEntries(new FormData(form)));history.replaceState({},'','index.html');await refresh();history.replaceState({},'',href('dashboard'));toast('Welcome back. Your garden is ready.');}catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}});
+  $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,submit=form.querySelector('button');submit.disabled=true;try{await api('login',Object.fromEntries(new FormData(form)));history.replaceState({},'','index.html');await refresh();history.replaceState({},'',href('dashboard'));toast('Welcome back. Your garden is ready.');loginPopup();}catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}});
 }
 function shell() {
   const links=[['dashboard','grid'],['tasks','tasks'],['plots','sprout'],['inventory','leaf'],...(isAdmin()?[['reports','report'],['staff','users']]:[])];
@@ -590,20 +590,32 @@ function openForm(action,id) {
   if(action==='remove-user') {const user=state.users.find(u=>u.user_id===Number(id));modal('Remove account?',`Remove ${escape(user.full_name)}? Access ends immediately. Garden history keeps their name; pending tasks and live crops become unassigned. This cannot be undone.`,'','remove-user',{user_id:user.user_id},'Remove account');}
   if(action==='edit-profile') modal('Edit profile','Update your details. Enter your current password to change your email or password. Security changes sign you out of every session.',`${field('Full name','full_name','text',state.user.full_name,'required maxlength="100" autocomplete="name"')}${field('Email address','email','email',state.user.email,'required maxlength="150" autocomplete="email"')}${field('Current password','current_password','password','','maxlength="128" autocomplete="current-password"')}${field('New password (optional, 8 characters minimum)','password','password','','minlength="8" maxlength="128" autocomplete="new-password"')}`,'profile',{},'Save profile');
 }
+const seenKey=()=>`botaniq-seen-${state.user.user_id}`;
+const seenTasks=()=>{try{return new Set(JSON.parse(localStorage.getItem(seenKey())||'[]'));}catch{return new Set();}};
+const newTasks=()=>{const seen=seenTasks();return assignedPending(state.tasks,state.user.user_id).filter(t=>!seen.has(t.task_id));};
+function markTasksSeen() {try{localStorage.setItem(seenKey(),JSON.stringify(assignedPending(state.tasks,state.user.user_id).map(t=>t.task_id)));}catch{}updateBell();}
+const taskRows=tasks=>tasks.map(t=>`<article class="review-row"><div><strong>${escape(t.task_type)} · ${escape(t.plot_code)}</strong><p>${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}</p></div></article>`).join('');
+function loginPopup() {
+  if(isAdmin())return;
+  const tasks=assignedPending(state.tasks,state.user.user_id);
+  if(!tasks.length)return;
+  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">You have ${tasks.length} task${tasks.length===1?'':'s'} to do</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="notification-body">${taskRows(tasks.slice(0,5))}${tasks.length>5?`<p class="queue-more">${tasks.length-5} more in Maintenance tasks.</p>`:''}${button('View my tasks','my-tasks','','small')}</div>`;
+  $('#modal').showModal();markTasksSeen();
+}
 function updateBell() {
   const bell=document.querySelector('[data-action="notifications"]');
   if(!bell)return;
-  const count=isAdmin()?notificationKeys(state).length:(state.invites||[]).filter(i=>!i.is_read).length;
+  const count=isAdmin()?notificationKeys(state).length:(state.invites||[]).filter(i=>!i.is_read).length+newTasks().length;
   bell.setAttribute('aria-label',`Notifications, ${count} unread`);
   bell.innerHTML=icon('bell')+(count?`<span class="notification-count" aria-hidden="true">${count}</span>`:'');
 }
 function notifications() {
   if(!isAdmin()) {
     const dialog=$('#modal');
-    dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">Tasks that need taking over</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div>
-      <div class="notification-body">${(state.invites||[]).map(i=>`<article class="review-row"><div><strong>${escape(i.task_type)} · ${escape(i.plot_code)}</strong><p>${fmt(i.scheduled_date)} · ${clock(i.scheduled_time)}</p>
+    dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">Notifications</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div>
+      <div class="notification-body">${newTasks().length?`<h3>Newly assigned tasks</h3>${taskRows(newTasks())}<h3>Takeover requests</h3>`:''}${(state.invites||[]).map(i=>`<article class="review-row"><div><strong>${escape(i.task_type)} · ${escape(i.plot_code)}</strong><p>${fmt(i.scheduled_date)} · ${clock(i.scheduled_time)}</p>
       ${button('Take over','takeover',i.invite_id,'small')} ${i.is_read?badge('Read','gray'):button('Mark read','read-invite',i.invite_id,'secondary small')}</div></article>`).join('')||empty('No tasks need taking over.')}</div>`;
-    if(!dialog.open)dialog.showModal();return;
+    if(!dialog.open)dialog.showModal();markTasksSeen();return;
   }
   const flags=state.tasks.filter(t=>t.is_flagged_for_admin),messages=state.messages||[],cover=state.tasks.filter(t=>needsCover(t,state.today));
   $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">Notifications</h2><button class="icon-button" data-action="close" aria-label="Close dialog">${icon('close')}</button></div><div class="notification-body"><h3>Tasks that need taking over</h3>${cover.map(t=>`<div class="review-row"><div><strong>${escape(t.plot_code)} · ${escape(t.task_type)}</strong><p>${fmt(t.scheduled_date)} · ${clock(t.scheduled_time)}<br>${escape(t.assigned_staff||'Unassigned')} needs cover. Staff were notified.</p></div>${button('Reassign','task-assignment',t.task_id,'secondary small')}</div>`).join('')||empty('No tasks need taking over.')}<h3>Staff messages</h3>${messages.map(m=>`<article class="review-row"><div><strong>${escape(m.full_name)}</strong><p>${escape(m.plot_code)} · ${escape(m.task_type)}<br>${escape(timestampLabel(m.created_at))}</p><p class="private-message">${escape(m.message)}</p></div>${!m.read_at?button('Mark read','read-message',m.message_id,'secondary small'):badge('Read','gray')}</article>`).join('')||empty('No staff messages yet.')}<h3>Task takeovers</h3>${flags.map(t=>`<div class="review-row"><div><h3>${escape(t.plot_code)} · ${escape(t.task_type)}</h3><p>${fmt(t.scheduled_date)}<br>${escape(t.substitute_staff)} accepted coverage${t.covered_for||t.assigned_staff_id!==t.substitute_staff_id?' for '+escape(t.covered_for||t.assigned_staff||'unassigned work'):''}.<br><strong>Reason:</strong> ${escape(t.takeover_reason)}</p></div>${button('Mark reviewed','review',t.task_id,'small')}</div>`).join('')||empty('No takeovers waiting for review.')}</div>`;
@@ -650,7 +662,7 @@ document.addEventListener('click',async event=>{
     if(action==='calendar-month'){calendarOffset+=Number(id);calendarDate='';renderMain();return;}
     if(action==='calendar-day'){calendarDate=calendarDate===id?'':id;renderMain();return;}
     if(action==='calendar-clear'){calendarDate='';renderMain();return;}
-    if(action==='my-tasks'){taskFilter='Open';navigate('tasks.html');return;}
+    if(action==='my-tasks'){$('#modal').close();taskFilter='Open';navigate('tasks.html');return;}
     if(action==='notifications'){notifications();return;}
     if(action==='read-invite'){target.disabled=true;await api('read-invite',{invite_id:Number(id)});await refresh();notifications();return;}
     if(action==='read-message'){target.disabled=true;await api('read-message',{message_id:Number(id)});await refresh();notifications();toast('Message marked as read.');return;}
