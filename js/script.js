@@ -593,7 +593,7 @@ function openForm(action,id) {
 const pushOn=()=>Boolean(state.push_key)&&'serviceWorker' in navigator&&'PushManager' in window&&!isAdmin();
 async function syncPush(ask) {
   if(!pushOn()||(Notification.permission!=='granted'&&!(ask&&await Notification.requestPermission()==='granted')))return;
-  const reg=await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.register('/sw.js');const reg=await navigator.serviceWorker.ready;
   const raw=atob(state.push_key.replace(/-/g,'+').replace(/_/g,'/'));
   const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:Uint8Array.from(raw,c=>c.charCodeAt(0))});
   await api('push-subscribe',sub.toJSON());
