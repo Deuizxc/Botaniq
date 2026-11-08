@@ -427,3 +427,12 @@ test('second demo admin signs in with admin rights',async t=>{
   assert.equal(user.full_name,'CUAI Admin 2');assert.equal(user.role,'Admin');
   assert.equal((await db.get("SELECT COUNT(*)::int AS n FROM schema_migrations WHERE name='009-reports-and-demo-admin'")).n,1);
 });
+test('push subscriptions belong to the user who enabled them and can be removed',async t=>{
+  const {db,request,login}=await fixture(t),staff=await login('heavenashley@gmail.com');
+  const sub={endpoint:'https://push.example/abc',keys:{p256dh:'p',auth:'a'}};
+  assert.equal((await request('/api/push-subscribe',{endpoint:'http://bad',keys:sub.keys},staff)).status,400);
+  assert.equal((await request('/api/push-subscribe',sub,staff)).status,200);
+  assert.equal((await db.get('SELECT user_id AS u FROM push_subscriptions')).u,2);
+  assert.equal((await request('/api/push-unsubscribe',{endpoint:sub.endpoint},staff)).status,200);
+  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM push_subscriptions')).n,0);
+});

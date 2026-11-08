@@ -1,5 +1,6 @@
 import http from 'node:http';
 import pg from 'pg';
+import * as webpush from 'web-push';
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -143,7 +144,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin']) {
+  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin', '010-push']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
@@ -285,6 +286,19 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
     );
     if (!user) fail('Choose an active staff member.');
     return user.user_id;
+  };
+
+  // Push is optional: without VAPID keys in the environment it silently does nothing.
+  const pushTo = async (userId, title, body) => {
+    const { VAPID_PUBLIC_KEY: pub, VAPID_PRIVATE_KEY: priv } = process.env;
+    if (!pub || !priv || !userId) return;
+    try {
+      webpush.setVapidDetails('mailto:admin@botaniq.app', pub, priv);
+      const subs = await baseDb.all('SELECT * FROM push_subscriptions WHERE user_id=?', userId);
+      await Promise.all(subs.map(sub => webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify({ title, body })).catch(err => {
+        if ([404, 410].includes(err.statusCode)) return baseDb.run('DELETE FROM push_subscriptions WHERE endpoint=?', sub.endpoint);
+      })));
+    } catch {}
   };
 
   const plot = async (db, id) => {
@@ -458,9 +472,15 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       if (c.harvest_date) fail('A harvested cycle cannot be reassigned.');
       const assignedStaff = await staff(baseDb, b.assigned_staff_id);
       await baseDb.run('UPDATE crop_cycles SET assigned_staff_id=? WHERE cycle_id=?', assignedStaff, c.cycle_id);
+    } else if (path === '/api/push-subscribe') {
+      const k = b.keys || {};
+      if (typeof b.endpoint !== 'string' || !b.endpoint.startsWith('https://') || b.endpoint.length > 1000 || typeof k.p256dh !== 'string' || typeof k.auth !== 'string') fail('Invalid notification subscription.');
+      await baseDb.run('INSERT INTO push_subscriptions(endpoint,user_id,p256dh,auth) VALUES(?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=EXCLUDED.user_id,p256dh=EXCLUDED.p256dh,auth=EXCLUDED.auth', b.endpoint, user.user_id, k.p256dh, k.auth);
+    } else if (path === '/api/push-unsubscribe') {
+      await baseDb.run('DELETE FROM push_subscriptions WHERE endpoint=? AND user_id=?', String(b.endpoint), user.user_id);
     } else if (path === '/api/tasks') {
       admin(user);
-      await transaction(async tx=>{
+      const made=await transaction(async tx=>{
       const p = await plot(tx, b.plot_id);
       const assignedStaff = await staff(tx, b.assigned_staff_id);
       const type=choice(b.task_type, taskTypes),scheduled=date(b.scheduled_date);
@@ -477,7 +497,9 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         assignedStaff,
         crop?.cycle_id??null
       );
+      return {assignedStaff,type,scheduled,plotCode:p.plot_code};
       });
+      await pushTo(made.assignedStaff,'New task assigned',`${made.type} · ${made.plotCode} on ${made.scheduled}`);
     } else if (path === '/api/task-message') {
       if (user.role !== 'Staff') fail('Only staff can send a task message.', 403);
       const task = await baseDb.get('SELECT * FROM maintenance_tasks WHERE task_id=?', identifier(b.task_id));
@@ -706,6 +728,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           '/css/style.css': ['css/style.css', 'text/css'],
           '/js/script.js': ['js/script.js', 'text/javascript'],
           '/js/garden.js': ['js/garden.js', 'text/javascript'],
+          '/sw.js': ['sw.js', 'text/javascript'],
           '/img/testinglang.png': ['img/testinglang.png', 'image/png'],
           '/img/qcu.png': ['img/qcu.png', 'image/png'],
           '/img/qculogo.png': ['img/qculogo.png', 'image/png'],
@@ -873,7 +896,8 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
           adjustments,
           nutrients,
           entries,
-          messages, invites
+          messages, invites,
+          push_key: process.env.VAPID_PUBLIC_KEY || null
         });
         return;
       }

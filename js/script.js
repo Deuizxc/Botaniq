@@ -110,7 +110,7 @@ function renderLanding() {
 function renderLogin() {
   $('#modal').close();document.title='BotaniQ · Log in';
   $('#app').innerHTML=`<main class="login"><section class="login-form"><div class="login-box"><a class="login-back" href="/">← Back</a><h1>Welcome!</h1><p>Log in to check your tasks and manage your plots</p><form id="login-form">${field('Email address','email','email','','required autocomplete="username" placeholder="Your email address"')}${field('Password','password','password','','required autocomplete="current-password" maxlength="128"')}<div class="form-error" role="alert"></div><button class="btn" type="submit">Log in</button></form><p class="login-foot">New here? Approach an admin for a staff account.</p></div></section><section class="login-art" aria-label="The QCU campus garden"><img class="login-background" src="/img/login_bg.png" alt="QCU campus gardens and greenhouses" width="778" height="825"><a class="university login-university" href="/"><img src="/img/qculogo.png" alt="Quezon City University seal"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><div class="login-brand"><img src="/img/Logo.png" alt="BotaniQ"><p>Assign · Track · Schedule</p></div><div class="login-photo-copy"><p>Good care today.<br>A greener campus tomorrow.</p><span>Quezon City University</span></div></section></main>`;
-  $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,submit=form.querySelector('button');submit.disabled=true;try{await api('login',Object.fromEntries(new FormData(form)));history.replaceState({},'','index.html');await refresh();history.replaceState({},'',href('dashboard'));toast('Welcome back. Your garden is ready.');sessionStorage.setItem('botaniq-greeted','1');loginPopup();}catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}});
+  $('#login-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,submit=form.querySelector('button');submit.disabled=true;try{await api('login',Object.fromEntries(new FormData(form)));history.replaceState({},'','index.html');await refresh();history.replaceState({},'',href('dashboard'));syncPush().catch(()=>{});toast('Welcome back. Your garden is ready.');sessionStorage.setItem('botaniq-greeted','1');loginPopup();}catch(error){form.querySelector('.form-error').textContent=error.message;}finally{submit.disabled=false;}});
 }
 function shell() {
   const links=[['dashboard','grid'],['tasks','tasks'],['plots','sprout'],['inventory','leaf'],...(isAdmin()?[['reports','report'],['staff','users']]:[])];
@@ -590,6 +590,18 @@ function openForm(action,id) {
   if(action==='remove-user') {const user=state.users.find(u=>u.user_id===Number(id));modal('Remove account?',`Remove ${escape(user.full_name)}? Access ends immediately. Garden history keeps their name; pending tasks and live crops become unassigned. This cannot be undone.`,'','remove-user',{user_id:user.user_id},'Remove account');}
   if(action==='edit-profile') modal('Edit profile','Update your details. Enter your current password to change your email or password. Security changes sign you out of every session.',`${field('Full name','full_name','text',state.user.full_name,'required maxlength="100" autocomplete="name"')}${field('Email address','email','email',state.user.email,'required maxlength="150" autocomplete="email"')}${field('Current password','current_password','password','','maxlength="128" autocomplete="current-password"')}${field('New password (optional, 8 characters minimum)','password','password','','minlength="8" maxlength="128" autocomplete="new-password"')}`,'profile',{},'Save profile');
 }
+const pushOn=()=>Boolean(state.push_key)&&'serviceWorker' in navigator&&'PushManager' in window&&!isAdmin();
+async function syncPush(ask) {
+  if(!pushOn()||(Notification.permission!=='granted'&&!(ask&&await Notification.requestPermission()==='granted')))return;
+  const reg=await navigator.serviceWorker.register('/sw.js');
+  const raw=atob(state.push_key.replace(/-/g,'+').replace(/_/g,'/'));
+  const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:Uint8Array.from(raw,c=>c.charCodeAt(0))});
+  await api('push-subscribe',sub.toJSON());
+}
+async function dropPush() {
+  try{const sub=await (await navigator.serviceWorker.getRegistration('/sw.js'))?.pushManager.getSubscription();if(sub){await api('push-unsubscribe',{endpoint:sub.endpoint});await sub.unsubscribe();}}catch{}
+}
+const pushButton=()=>pushOn()&&Notification.permission==='default'?button('Turn on phone alerts','enable-push','','secondary small'):'';
 const seenKey=()=>`botaniq-seen-${state.user.user_id}`;
 const seenTasks=()=>{try{return new Set(JSON.parse(localStorage.getItem(seenKey())||'[]'));}catch{return new Set();}};
 const newTasks=()=>{const seen=seenTasks();return assignedPending(state.tasks,state.user.user_id).filter(t=>!seen.has(t.task_id));};
@@ -599,7 +611,7 @@ function loginPopup() {
   if(isAdmin())return;
   const tasks=assignedPending(state.tasks,state.user.user_id);
   if(!tasks.length)return;
-  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">Notifications</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="notification-body"><h3>You have ${tasks.length} task${tasks.length===1?'':'s'} to do</h3>${taskRows(tasks.slice(0,5))}${tasks.length>5?`<p class="queue-more">${tasks.length-5} more in Maintenance tasks.</p>`:''}${button('View my tasks','my-tasks','','small')}</div>`;
+  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">Notifications</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="notification-body"><h3>You have ${tasks.length} task${tasks.length===1?'':'s'} to do</h3>${taskRows(tasks.slice(0,5))}${tasks.length>5?`<p class="queue-more">${tasks.length-5} more in Maintenance tasks.</p>`:''}${button('View my tasks','my-tasks','','small')} ${pushButton()}</div>`;
   $('#modal').showModal();markTasksSeen();
 }
 function updateBell() {
@@ -613,7 +625,7 @@ function notifications() {
   if(!isAdmin()) {
     const dialog=$('#modal');
     dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">Notifications</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div>
-      <div class="notification-body">${newTasks().length?`<h3>Newly assigned tasks</h3>${taskRows(newTasks())}${(state.invites||[]).length?'<h3>Takeover requests</h3>':''}`:''}${(state.invites||[]).map(i=>`<article class="review-row"><div><strong>${escape(i.task_type)} · ${escape(i.plot_code)}</strong><p>${fmt(i.scheduled_date)} · ${clock(i.scheduled_time)}</p>
+      <div class="notification-body">${pushButton()}${newTasks().length?`<h3>Newly assigned tasks</h3>${taskRows(newTasks())}${(state.invites||[]).length?'<h3>Takeover requests</h3>':''}`:''}${(state.invites||[]).map(i=>`<article class="review-row"><div><strong>${escape(i.task_type)} · ${escape(i.plot_code)}</strong><p>${fmt(i.scheduled_date)} · ${clock(i.scheduled_time)}</p>
       ${button('Take over','takeover',i.invite_id,'small')} ${i.is_read?badge('Read','gray'):button('Mark read','read-invite',i.invite_id,'secondary small')}</div></article>`).join('')||empty('No tasks need taking over.')}</div>`;
     if(!dialog.open)dialog.showModal();markTasksSeen();return;
   }
@@ -670,7 +682,8 @@ document.addEventListener('click',async event=>{
     if(action==='account'){
       const menu=$('#profile-menu');menu.hidden=!menu.hidden;target.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)menu.querySelector('button').focus();return;
     }
-    if(action==='logout'){await api('logout',{});state=null;history.pushState({},'','login.html');renderLogin();return;}
+    if(action==='enable-push'){await syncPush(true);$('#modal').close();toast(Notification.permission==='granted'?'Phone alerts are on.':'Phone alerts were not allowed.');return;}
+    if(action==='logout'){await dropPush();await api('logout',{});state=null;history.pushState({},'','login.html');renderLogin();return;}
     openForm(action,id);
   }catch(error){target.disabled=false;toast(error.message);}
 });
@@ -679,6 +692,7 @@ const landingRoute=['/','/index.html'].includes(location.pathname);
 try {
   const [loaded]=await Promise.all([api('state').catch(error=>{if(error.message!=='Please sign in to continue.')toast(error.message);return null;}),new Promise(resolve=>setTimeout(resolve,landingRoute&&!matchMedia('(prefers-reduced-motion: reduce)').matches?1000:0))]);
   state=loaded;
+  if(state)syncPush().catch(()=>{});
   if(landingRoute)renderLanding();else if(state){view=getView();shell();if(!sessionStorage.getItem('botaniq-greeted')){sessionStorage.setItem('botaniq-greeted','1');loginPopup();}}else renderLogin();
 } catch(error){renderLogin();toast(error.message);}
 
