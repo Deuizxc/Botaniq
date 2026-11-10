@@ -144,7 +144,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin', '010-push']) {
+  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin', '010-push', '011-remove-crop']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
@@ -344,6 +344,27 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         String(b.variety || '').trim().slice(0, 80),
         String(b.notes || '').slice(0, 500)
       );
+    } else if (path === '/api/remove-plant') {
+      admin(user);
+      await transaction(async tx => {
+        const id = identifier(b.plant_id);
+        if (!(await tx.get('SELECT plant_id FROM plants WHERE plant_id=? FOR UPDATE', id))) fail('Crop not found.', 404);
+        if (await tx.get('SELECT cycle_id FROM crop_cycles WHERE plant_id=?', id)) fail('This crop has been planted before, so its records must stay. Only crops that were never planted can be deleted.', 409);
+        await tx.run('DELETE FROM plants WHERE plant_id=?', id);
+      });
+    } else if (path === '/api/remove-crop') {
+      admin(user);
+      await transaction(async tx => {
+        let c = await recentCycle(tx, b.cycle_id);
+        await plot(tx, c.current_plot_id);
+        c = await tx.get('SELECT * FROM crop_cycles WHERE cycle_id=? FOR UPDATE', c.cycle_id);
+        if (c.harvest_date) fail('This crop has already left the plot.', 409);
+        if (await tx.get("SELECT task_id FROM maintenance_tasks WHERE cycle_id=? AND task_type='Harvest' AND status='Pending'", c.cycle_id)) fail('Resolve the pending harvest task before removing this crop.', 409);
+        // Closing the cycle keeps history; the date is clamped so the planted_date CHECK holds.
+        const end = today() < (c.transplanted_date || c.planted_date) ? (c.transplanted_date || c.planted_date) : today();
+        await tx.run("UPDATE crop_cycles SET harvest_date=?,cycle_status='Removed' WHERE cycle_id=?", end, c.cycle_id);
+        await tx.run("UPDATE plots SET occupancy_status='Vacant' WHERE plot_id=?", c.current_plot_id);
+      });
     } else if (path === '/api/plot-entry') {
       admin(user);
       const description = required(b.description, 'Description', 500);

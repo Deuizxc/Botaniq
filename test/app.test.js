@@ -160,6 +160,19 @@ test('harvest, replacement, assignment and date validation preserve history',asy
   assert.equal((await request('/api/cycle-assignment',{cycle_id:8,assigned_staff_id:''},admin)).status,200);
   assert.equal((await db.get('SELECT assigned_staff_id FROM crop_cycles WHERE cycle_id=8')).assigned_staff_id,null);
 });
+test('admin can remove a live crop and delete only never-planted crops',async t=>{
+  const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
+  assert.equal((await request('/api/remove-crop',{cycle_id:1},staff)).status,403);
+  assert.equal((await request('/api/remove-crop',{cycle_id:1},admin)).status,200);
+  assert.equal((await db.get('SELECT cycle_status FROM crop_cycles WHERE cycle_id=1')).cycle_status,'Removed');
+  assert.equal((await db.get('SELECT occupancy_status FROM plots WHERE plot_id=1')).occupancy_status,'Vacant');
+  assert.equal((await request('/api/remove-crop',{cycle_id:1},admin)).status,409);
+  assert.equal((await request('/api/plants',{crop_name:'Never planted'},admin)).status,200);
+  const fresh=(await db.get("SELECT plant_id FROM plants WHERE crop_name='Never planted'")).plant_id;
+  assert.equal((await request('/api/remove-plant',{plant_id:fresh},staff)).status,403);
+  assert.equal((await request('/api/remove-plant',{plant_id:fresh},admin)).status,200);
+  assert.equal((await request('/api/remove-plant',{plant_id:(await db.get('SELECT plant_id FROM crop_cycles WHERE cycle_id=1')).plant_id},admin)).status,409);
+});
 test('account management, password changes and session revocation are enforced',async t=>{
   const {request,login,password}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
   assert.equal((await request('/api/remove-user',{user_id:1},admin)).status,400);

@@ -180,7 +180,7 @@ export function plotHistory(state, plot) {
   return [...snapshots, ...applications, ...cycles.map(c => {
     const moved = c.current_plot_id !== plot.plot_id;
     const end = moved ? c.transplanted_date : c.harvest_date;
-    return { ...plotOverview(state, plot, c, end), key: `cycle-${c.cycle_id}`, date: end, type: moved ? 'Transplanted' : 'Harvested' };
+    return { ...plotOverview(state, plot, c, end), key: `cycle-${c.cycle_id}`, date: end, type: moved ? 'Transplanted' : c.cycle_status === 'Removed' ? 'Removed' : 'Harvested' };
   })].sort((a, b) => b.date.localeCompare(a.date) || (b.entry_id || 0) - (a.entry_id || 0));
 }
 
