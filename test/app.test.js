@@ -173,6 +173,15 @@ test('admin can remove a live crop and delete only never-planted crops',async t=
   assert.equal((await request('/api/remove-plant',{plant_id:fresh},admin)).status,200);
   assert.equal((await request('/api/remove-plant',{plant_id:(await db.get('SELECT plant_id FROM crop_cycles WHERE cycle_id=1')).plant_id},admin)).status,409);
 });
+test('admin can delete only open tasks',async t=>{
+  const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
+  const open=(await db.get("SELECT task_id FROM maintenance_tasks WHERE status='Pending'")).task_id;
+  assert.equal((await request('/api/remove-task',{task_id:open},staff)).status,403);
+  assert.equal((await request('/api/remove-task',{task_id:open},admin)).status,200);
+  assert.equal((await request('/api/remove-task',{task_id:open},admin)).status,409);
+  const done=await db.get("SELECT task_id FROM maintenance_tasks WHERE status<>'Pending'");
+  if(done) assert.equal((await request('/api/remove-task',{task_id:done.task_id},admin)).status,409);
+});
 test('account management, password changes and session revocation are enforced',async t=>{
   const {request,login,password}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
   assert.equal((await request('/api/remove-user',{user_id:1},admin)).status,400);

@@ -521,6 +521,10 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
       return {assignedStaff,type,scheduled,plotCode:p.plot_code};
       });
       await pushTo(made.assignedStaff,'New task assigned',`${made.type} · ${made.plotCode} on ${made.scheduled}`);
+    } else if (path === '/api/remove-task') {
+      admin(user);
+      const r = await baseDb.run("DELETE FROM maintenance_tasks WHERE task_id=? AND status='Pending'", identifier(b.task_id));
+      if (!r.changes) fail('Only open tasks can be deleted.', 409);
     } else if (path === '/api/task-message') {
       if (user.role !== 'Staff') fail('Only staff can send a task message.', 403);
       const task = await baseDb.get('SELECT * FROM maintenance_tasks WHERE task_id=?', identifier(b.task_id));
