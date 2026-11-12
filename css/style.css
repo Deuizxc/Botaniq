@@ -2012,3 +2012,159 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
   .report-table tr,.report-sign {break-inside:avoid}
   .report-paper h3 {break-after:avoid}
 }
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  :root {
+    --botaniq-ease: cubic-bezier(.22, 1, .36, 1);
+    --botaniq-speed: 220ms;
+  }
+
+  /* Smooth existing hover, focus, selected and disabled states. */
+  :is(
+    button,
+    a,
+    input,
+    select,
+    textarea,
+    .search,
+    .stat,
+    .plot-card,
+    .task-card,
+    .person-card,
+    .badge,
+    .task-check,
+    .task-row,
+    .review-row,
+    .team-row,
+    .atlas-task,
+    .greenhouse-bed,
+    .task-item > summary,
+    .task-group > summary,
+    .history-entry > summary
+  ) {
+    transition:
+      background-color var(--botaniq-speed) ease,
+      color var(--botaniq-speed) ease,
+      border-color var(--botaniq-speed) ease,
+      box-shadow var(--botaniq-speed) ease,
+      opacity var(--botaniq-speed) ease,
+      transform var(--botaniq-speed) var(--botaniq-ease);
+  }
+
+  .btn:active,
+  .landing-link:active {
+    transition-duration: 80ms;
+  }
+
+  .main.view-enter,
+  .inspector-content {
+    animation-duration: 280ms;
+    animation-timing-function: var(--botaniq-ease);
+  }
+
+  .landing-header .university,
+  .landing-header > .btn,
+  .landing-intro h1,
+  .landing-copy > p,
+  .landing-link,
+  .landing-footer > * {
+    animation-duration: 450ms;
+    animation-timing-function: var(--botaniq-ease);
+  }
+
+  .login-box,
+  .stats > .stat,
+  .plot-grid > .plot-card,
+  .task-cards > .task-card,
+  .account-grid > .person-card,
+  .dashboard-grid > .panel,
+  .task-summary > a,
+  .cover-alert,
+  .report-paper {
+    animation: botaniq-fade-in 360ms var(--botaniq-ease);
+  }
+
+  dialog[open] {
+    animation: botaniq-rise-in 280ms var(--botaniq-ease);
+  }
+
+  dialog[open]::backdrop {
+    animation: botaniq-fade-in 220ms ease-out;
+  }
+
+  .profile-menu:not([hidden]) {
+    animation: botaniq-rise-in 220ms var(--botaniq-ease);
+  }
+
+  .plot-inspector {
+    animation-duration: 320ms;
+    animation-timing-function: var(--botaniq-ease);
+  }
+
+  .history-entry[open] > .history-entry-body,
+  .task-item[open] > .task-detail {
+    animation: botaniq-rise-in 240ms var(--botaniq-ease);
+  }
+
+  .history-expand {
+    transition: transform 240ms var(--botaniq-ease);
+  }
+
+  #toast.visible {
+    animation: botaniq-toast-in 280ms var(--botaniq-ease);
+  }
+
+  .plot-shape {
+    transition:
+      fill 240ms ease,
+      stroke 240ms ease,
+      filter 240ms ease;
+  }
+
+  .map-plot {
+    transition: opacity 240ms ease;
+  }
+
+  .map-svg.panning .map-world,
+  .editing-map .map-world {
+    transition: none;
+  }
+}
+
+@keyframes botaniq-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes botaniq-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes botaniq-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce), print {
+  *,
+  *::before,
+  *::after,
+  dialog::backdrop {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
