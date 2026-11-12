@@ -33,14 +33,6 @@ The system is deliberately lightweight: a vanilla HTML, CSS, and JavaScript fron
 ## Technical Architecture
 
 
-
-| :-- | :-- |
-| Front end | Vanilla HTML, CSS, and JavaScript (ES modules), single-page shell |
-| Back end | Node.js (`node:http`), no web framework |
-| Database | PostgreSQL via [`pg`](https://node-postgres.com/), using the `citext` extension |
-| Testing | Node's built-in test runner with in-memory PostgreSQL ([PGlite](https://pglite.dev/)) |
-| Hosting | Local Node server or Vercel serverless function |
-
 **Single-page shell.** Every page route (`login.html`, `plot-info.html`, `tasks.html`, and so on) serves the same `index.html`, so navigation and back/forward work without duplicate templates. The client renders each view and talks to a small JSON API: `GET /api/state` returns only the data the signed-in user may see, and `POST` endpoints perform actions such as task and crop-cycle changes.
 
 **Rules in two places.** Business rules such as transplant validity, takeover validation, and early-completion checks live in `backend.js`. The same constraints are duplicated in the database (check constraints, foreign keys, partial unique indexes) as a second line of defense.
