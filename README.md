@@ -38,7 +38,7 @@ It supports two roles. **Admins** manage plots, crop cycles, tasks, and accounts
   <img src="assets/git2.png" width="48%" alt="Admin dashboard" />
 </p>
 <p align="center">
-  <img src="assets/git3.png" width="48%" alt="Interactive garden map" />
+  <img src="assets/landingpage.png" width="48%" alt="Interactive garden map" />
   <img src="assets/git4.png" width="48%" alt="Task management" />
 </p>
 
