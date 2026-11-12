@@ -2168,3 +2168,123 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
     scroll-behavior: auto !important;
   }
 }
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* Cards appear in a short, staggered sequence. */
+  :is(.stats, .plot-grid, .task-cards, .account-grid, .task-summary) > * {
+    animation: botaniq-card-arrive 380ms
+      cubic-bezier(.22, 1, .36, 1) backwards;
+  }
+
+  :is(.stats, .plot-grid, .task-cards, .account-grid, .task-summary)
+    > :nth-child(2) {
+    animation-delay: 40ms;
+  }
+
+  :is(.stats, .plot-grid, .task-cards, .account-grid, .task-summary)
+    > :nth-child(3) {
+    animation-delay: 80ms;
+  }
+
+  :is(.stats, .plot-grid, .task-cards, .account-grid, .task-summary)
+    > :nth-child(4) {
+    animation-delay: 120ms;
+  }
+
+  :is(.stats, .plot-grid, .task-cards, .account-grid, .task-summary)
+    > :nth-child(n + 5) {
+    animation-delay: 160ms;
+  }
+
+  /* Animate revealed details without changing their final layout. */
+  .task-item[open] > .task-detail,
+  .history-entry[open] > .history-entry-body {
+    animation: botaniq-detail-reveal 280ms
+      cubic-bezier(.22, 1, .36, 1);
+  }
+
+  /* Preserve the existing sidebar transforms and visibility rules. */
+  .sidebar {
+    transition:
+      transform 300ms cubic-bezier(.22, 1, .36, 1),
+      visibility 0s linear 300ms;
+  }
+
+  .sidebar.open {
+    transition:
+      transform 300ms cubic-bezier(.22, 1, .36, 1),
+      visibility 0s linear 0s;
+  }
+}
+
+/*
+ * Supporting browsers can keep menus and toasts rendered briefly
+ * while display changes, allowing CSS-only exit fades.
+ */
+@supports (transition-behavior: allow-discrete) {
+  @media screen and (prefers-reduced-motion: no-preference) {
+    .profile-menu {
+      opacity: 0;
+      translate: 0 -5px;
+      transition:
+        opacity 180ms ease,
+        translate 220ms cubic-bezier(.22, 1, .36, 1),
+        display 220ms allow-discrete;
+    }
+
+    .profile-menu:not([hidden]) {
+      opacity: 1;
+      translate: 0 0;
+      animation: none;
+    }
+
+    #toast {
+      opacity: 0;
+      translate: 0 8px;
+      transition:
+        opacity 200ms ease,
+        translate 240ms cubic-bezier(.22, 1, .36, 1),
+        display 240ms allow-discrete;
+    }
+
+    #toast.visible {
+      opacity: 1;
+      translate: 0 0;
+      animation: none;
+    }
+
+    @starting-style {
+      .profile-menu:not([hidden]) {
+        opacity: 0;
+        translate: 0 -5px;
+      }
+
+      #toast.visible {
+        opacity: 0;
+        translate: 0 8px;
+      }
+    }
+  }
+}
+
+@keyframes botaniq-card-arrive {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes botaniq-detail-reveal {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
