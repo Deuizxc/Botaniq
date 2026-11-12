@@ -57,42 +57,6 @@ flowchart LR
 
 ---
 
-## Installation and Execution
-
-### Requirements
-* [Node.js](https://nodejs.org/) 20 or later
-* A PostgreSQL database (local or hosted) where the `citext` extension can be created. The database user needs permission to create and alter tables, because migrations run automatically.
-
-### Run it locally
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/Deuizxc/Botaniq.git
-cd Botaniq
-
-# 2. Install dependencies
-npm install
-
-# 3. Point the app at your database
-export DATABASE_URL="postgres://user:password@localhost:5432/botaniq"
-
-# 4. Create the base tables (run once)
-psql "$DATABASE_URL" -f schema.sql
-
-# 5. Start the server
-npm start
-```
-
-Open **http://localhost:3000**. Do not open `index.html` directly, because sign-in and records require the server.
-
-On first run against an empty database, the app seeds demonstration garden data and demo accounts. Replace the demo accounts and data before any real use.
-
-### Configuration
-
-| Variable | Required | Description |
-| :-- | :-: | :-- |
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `PORT` | No | Local server port. Defaults to `3000`. |
 
 ### Deploy to Vercel
 
