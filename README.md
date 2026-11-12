@@ -58,16 +58,6 @@ flowchart LR
 ---
 
 
-## Testing
-
-```bash
-npm test
-```
-
-The suite of about 50 tests runs on Node's built-in test runner against an isolated in-memory PostgreSQL engine (PGlite). It needs no `DATABASE_URL` and never touches a live database. Coverage includes role boundaries, transaction rollback, transplant and takeover validation, account removal, fertilizer completion, migrations, and page routing.
-
----
-
 ## Project Structure
 
 ```text
