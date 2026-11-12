@@ -32,14 +32,8 @@ The system is deliberately lightweight: a vanilla HTML, CSS, and JavaScript fron
 
 ## Technical Architecture
 
-```mermaid
-flowchart LR
-    Browser["Browser<br/>index.html · css · js"] -->|"fetch /api/*"| Backend["backend.js<br/>auth · rules · API"]
-    Backend -->|"pg pool"| DB[("PostgreSQL")]
-    Vercel["api/index.js<br/>Vercel function"] --> Backend
-```
 
-| Layer | Technology |
+
 | :-- | :-- |
 | Front end | Vanilla HTML, CSS, and JavaScript (ES modules), single-page shell |
 | Back end | Node.js (`node:http`), no web framework |
