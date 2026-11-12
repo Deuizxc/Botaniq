@@ -4,10 +4,6 @@ BotaniQ is a database-driven web application for managing the CUAI garden at Que
 
 The system is deliberately lightweight: a vanilla HTML, CSS, and JavaScript front end served by a small Node.js backend on top of PostgreSQL. There is no front-end framework, no web framework, and no build step, which keeps it easy to run, review, and hand over to future maintainers.
 
-It supports two roles. **Admins** manage plots, crop cycles, tasks, and accounts. **Staff** view the garden, complete assigned tasks, record fertilizer use, and message admins.
-
-> Seeded crops, plots, and tasks are fictional demonstration records.
-
 ---
 
 ## Key Features
