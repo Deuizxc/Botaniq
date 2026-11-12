@@ -58,17 +58,6 @@ flowchart LR
 ---
 
 
-### Deploy to Vercel
-
-1. Provision a hosted PostgreSQL database and run `schema.sql` against it.
-2. Import the repository into Vercel.
-3. Add `DATABASE_URL` as an environment variable.
-4. Deploy.
-
-`api/index.js` exposes the backend as a serverless function, and `vercel.json` rewrites `/api/*` to it, maps each page route to `index.html`, and bundles the `migrations/` folder.
-
----
-
 ## Testing
 
 ```bash
