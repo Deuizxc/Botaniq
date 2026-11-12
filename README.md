@@ -1,13 +1,3 @@
-# BotaniQ
-**Garden tracking and resource management for the Center for Urban Agriculture and Innovation (CUAI), Quezon City University**
-
-![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2020-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-ES%20Modules-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
-![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
-
----
-
 ## Project Overview
 
 BotaniQ is a database-driven web application for managing the CUAI garden at Quezon City University. It replaces ad hoc notes with a single source of truth for three questions: **what is planted where, who is responsible for it, and what care it needs today.**
