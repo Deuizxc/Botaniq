@@ -91,7 +91,7 @@ small {
   color:#8a977f
 }
 .boot {
-  padding:12vh 12vw;
+  padding:calc(12vh / var(--zoom,1)) calc(12vw / var(--zoom,1));
   font-size:40px
 }
 .boot span {
@@ -195,7 +195,7 @@ small {
 }
 .layout {
   margin-left:232px;
-  min-height:100vh
+  min-height:calc(100vh / var(--zoom,1))
 }
 .topbar {
   height:84px;
@@ -206,7 +206,7 @@ small {
   color:#fff;
   display:flex;
   align-items:center;
-  padding:0 clamp(24px,3vw,58px);
+  padding:0 clamp(24px,calc(3vw / var(--zoom,1)),58px);
   gap:20px;
   position:sticky;
   top:0;
@@ -284,7 +284,7 @@ small {
   color:inherit
 }
 .profile-wrap {position:relative}
-.profile-menu {position:absolute;right:0;top:calc(100% + 12px);width:260px;max-width:calc(100vw - 32px);padding:20px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px #243b2b20;z-index:20}
+.profile-menu {position:absolute;right:0;top:calc(100% + 12px);width:260px;max-width:calc(calc(100vw / var(--zoom,1)) - 32px);padding:20px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px #243b2b20;z-index:20}
 .profile-menu[hidden] {display:none}
 .profile-menu strong,.profile-menu span {display:block;overflow-wrap:anywhere}
 .profile-menu span {font-size:14px;color:#596653;margin:6px 0 12px}
@@ -1088,7 +1088,7 @@ dialog {
   border-radius:12px;
   padding:0;
   width:min(520px,calc(100% - 32px));
-  max-height:90vh;
+  max-height:calc(90vh / var(--zoom,1));
   color:var(--dark);
   box-shadow:0 25px 90px #172e3233
 }
@@ -1448,7 +1448,7 @@ dialog::backdrop {
 .map-caption svg {width:15px;height:15px}
 .map-picker {margin-left:auto}
 .map-picker select {max-width:180px;padding:8px 10px;border:1px solid #dce4d1;border-radius:6px;background:#f9fbf5;color:#607451;font-size:14px;min-height:36px}
-.map-viewport {height:clamp(500px,65vh,740px);overflow:hidden;background:#edf1e4}
+.map-viewport {height:clamp(500px,calc(65vh / var(--zoom,1)),740px);overflow:hidden;background:#edf1e4}
 .map-svg {display:block;width:100%;height:100%;stroke:none;fill:initial}
 .map-world {transform-origin:0 0;transition:transform .65s cubic-bezier(.22,.68,.15,1)}
 .map-ground {fill:#e9eedf}
@@ -1540,7 +1540,7 @@ dialog::backdrop {
 @media(prefers-reduced-motion:reduce) {.plot-inspector {animation:none}.map-world {transition:none}}
 
 /* The public pages use the university's own seal, garden photograph and green palette. */
-.boot {min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#f5f6f1;color:var(--dark);font-size:20px}
+.boot {min-height:calc(100svh / var(--zoom,1));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#f5f6f1;color:var(--dark);font-size:20px}
 .boot span {font-size:14px;color:#596653}
 .growing-plant {width:110px;height:140px;stroke:var(--green);stroke-width:3;fill:none}
 .plant-stem {stroke-dasharray:90;stroke-dashoffset:0;animation:stem-grow 2.8s ease-out infinite}
@@ -1553,7 +1553,7 @@ dialog::backdrop {
 @keyframes leaf-three {0%,18% {transform:scale(0);opacity:0}29%,84% {transform:scale(1);opacity:1}94%,100% {transform:scale(1);opacity:0}}
 @keyframes leaf-four {0%,24% {transform:scale(0);opacity:0}36%,84% {transform:scale(1);opacity:1}94%,100% {transform:scale(1);opacity:0}}
 .landing {background:#f5f6f1;color:var(--dark)}
-.landing-header,.landing-intro,.landing-footer {padding-inline:clamp(24px,5vw,80px)}
+.landing-header,.landing-intro,.landing-footer {padding-inline:clamp(24px,calc(5vw / var(--zoom,1)),80px)}
 .landing-header {display:flex;align-items:center;justify-content:space-between;gap:24px;padding-block:16px}
 .landing-header .university img {width:56px;height:56px;object-fit:contain}
 .university {display:flex;align-items:center;gap:20px}
@@ -1561,32 +1561,32 @@ dialog::backdrop {
 .university strong {display:block;font-size:22px;font-weight:600}
 .university small {display:block;font-size:16px;margin-top:5px}
 .landing .btn {border-radius:4px;padding:16px 28px;font-size:16px;background:#53651b;color:#fff}
-.landing-intro {display:grid;grid-template-columns:1.2fr 1fr;gap:64px;align-items:center;padding-block:clamp(24px,3vw,40px)}
-.landing h1 {font:600 clamp(52px,6.7vw,100px)/1.02 var(--display);letter-spacing:-.04em;color:var(--dark)}
-.landing-copy>p:first-child {font:400 clamp(24px,2.3vw,34px)/1.25 var(--display);margin-bottom:22px}
+.landing-intro {display:grid;grid-template-columns:1.2fr 1fr;gap:64px;align-items:center;padding-block:clamp(24px,calc(3vw / var(--zoom,1)),40px)}
+.landing h1 {font:600 clamp(52px,calc(6.7vw / var(--zoom,1)),100px)/1.02 var(--display);letter-spacing:-.04em;color:var(--dark)}
+.landing-copy>p:first-child {font:400 clamp(24px,calc(2.3vw / var(--zoom,1)),34px)/1.25 var(--display);margin-bottom:22px}
 .landing-copy>p {font-size:18px;line-height:1.65;max-width:40ch}
 .welcome-logo {display:block;width:min(100%,420px);height:auto}
 .landing-footer .brand img {width:160px;height:auto}
 .landing-footer {display:flex;align-items:center;justify-content:space-between;gap:24px;padding-block:24px}
 .landing-footer p {font:18px/1.5 var(--display)}
 .landing-footer .brand {padding:0;color:var(--dark)}
-.login {display:grid;grid-template-columns:52.5fr 47.5fr;min-height:100svh;background:#fff;padding:0;gap:0}
+.login {display:grid;grid-template-columns:52.5fr 47.5fr;min-height:calc(100svh / var(--zoom,1));background:#fff;padding:0;gap:0}
 .login-form {position:relative;grid-column:2;grid-row:1;display:flex;align-items:center;justify-content:center;padding:80px 36px 36px;background:#fff}
 .login-box {width:100%;max-width:400px}
 .login-back {position:absolute;top:22px;left:22px;display:inline-flex;min-height:36px;align-items:center;padding:4px 12px;border:1px solid #53651b;border-radius:9px;font:600 16px var(--display);color:#53651b}
 .login-seal {display:block;object-fit:cover;object-position:left;margin-bottom:20px}
 .login-box .brand {padding:0;color:var(--dark);margin-bottom:36px;font-size:34px}
-.login-box h1 {font:700 clamp(34px,3vw,48px)/1.15 var(--display);text-align:center;letter-spacing:-.025em;margin-bottom:18px}
+.login-box h1 {font:700 clamp(34px,calc(3vw / var(--zoom,1)),48px)/1.15 var(--display);text-align:center;letter-spacing:-.025em;margin-bottom:18px}
 .login-box>p {font:16px/1.6 var(--display);text-align:center;color:#33583d;margin-bottom:28px}
 .login-box .field label {font-size:14px;color:var(--dark)}
 .login-box .field input {min-height:44px;background:#f0efe9;border-color:#53651b;font-size:16px;border-radius:6px}
 .login-box .btn {width:100%;min-height:44px;margin-top:24px;border-radius:6px;font-size:16px;background:#53651b}
 .login-box .login-foot {font-size:14px;margin:24px 0 0}
-.login-art {grid-column:1;grid-row:1;position:relative;min-height:100svh;overflow:hidden;background:var(--dark);border-radius:0}
+.login-art {grid-column:1;grid-row:1;position:relative;min-height:calc(100svh / var(--zoom,1));overflow:hidden;background:var(--dark);border-radius:0}
 .login-background {position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .login-art:after {content:'';position:absolute;inset:0;background:#17371969}
 .login-photo-copy {position:absolute;bottom:60px;left:40px;right:40px;z-index:1;color:#fff;background:#1d352bc9;padding:24px}
-.login-photo-copy p {font:400 clamp(25px,2.4vw,36px)/1.15 var(--display);margin-bottom:24px}
+.login-photo-copy p {font:400 clamp(25px,calc(2.4vw / var(--zoom,1)),36px)/1.15 var(--display);margin-bottom:24px}
 .login-photo-copy span {font-size:16px}
 .btn,.landing-link {transition:transform .15s ease,opacity .15s ease}
 .btn:hover,.landing-link:hover {transform:translateY(-1px)}
@@ -1600,7 +1600,7 @@ dialog::backdrop {
   .landing .btn {font-size:14px;padding:12px 14px;white-space:nowrap}.landing .btn svg {display:none}
   .landing-intro {grid-template-columns:1fr;gap:28px;padding-block:38px}.landing h1 {font-size:58px}.landing-copy>p:first-child {font-size:26px;margin-bottom:16px}.landing-copy>p {font-size:16px}
   .landing-scene {height:340px}.landing-footer {align-items:flex-start}.landing-footer p {max-width:145px}
-  .login {display:flex;flex-direction:column;padding:0;gap:0}.login-form {padding:24px;min-height:100svh}.login-art {display:block;min-height:360px;border-radius:0}.login-box {max-width:400px}
+  .login {display:flex;flex-direction:column;padding:0;gap:0}.login-form {padding:24px;min-height:calc(100svh / var(--zoom,1))}.login-art {display:block;min-height:360px;border-radius:0}.login-box {max-width:400px}
   .login-background {display:block}.login-photo-copy p {display:block;font-size:30px}.login-photo-copy {left:24px;right:24px}
 }
 @media(prefers-reduced-motion:reduce) {*,*:before,*:after {animation:none!important;transition:none!important}}
@@ -1711,7 +1711,7 @@ dialog::backdrop {
   .main:has(.task-fab) {padding-bottom:100px}.main:has(.task-fab) .heading-actions {display:none}
   .map-bottom {flex-wrap:wrap}.map-controls {width:100%;justify-content:flex-end}.map-key {font-size:14px}.map-picker select {max-width:180px}
   .login-photo-copy p {font-size:24px}.task-calendar {padding:16px}.calendar-grid {gap:2px}
-  #toast {max-width:calc(100vw - 32px);white-space:normal;bottom:90px;font-size:14px}
+  #toast {max-width:calc(calc(100vw / var(--zoom,1)) - 32px);white-space:normal;bottom:90px;font-size:14px}
 }
 
 /* Shared flower header keeps the existing navigation and page controls. */
@@ -1727,7 +1727,7 @@ dialog::backdrop {
   color:#fff;
   display:flex;
   align-items:center;
-  padding:0 clamp(24px,3vw,58px);
+  padding:0 clamp(24px,calc(3vw / var(--zoom,1)),58px);
   gap:20px;
   position:sticky;
   top:0;
@@ -1741,14 +1741,14 @@ dialog::backdrop {
 .topbar .profile strong {font:700 16px var(--display)}
 .topbar .profile small {font-size:13px}
 .brand-logo {display:block;width:100%;height:auto}
-.main {--page-gutter:clamp(24px,3vw,58px);max-width:none;padding:0 var(--page-gutter) 24px;min-height:calc(100svh - 84px);display:flex;flex-direction:column}
+.main {--page-gutter:clamp(24px,calc(3vw / var(--zoom,1)),58px);max-width:none;padding:0 var(--page-gutter) 24px;min-height:calc(100svh / var(--zoom,1) - 84px);display:flex;flex-direction:column}
 .page-heading {position:relative;min-height:186px;margin:0 0 88px;padding:30px 0 38px;align-items:center}
-.page-heading h1 {font:700 clamp(34px,3.4vw,62px)/1.12 var(--display);letter-spacing:-.025em;color:#fff;text-shadow:0 2px 3px #243b2b;-webkit-text-stroke:1px #53651b}
-.page-heading p {color:#fff;font:clamp(17px,1.5vw,26px)/1.5 var(--display);text-shadow:0 1px 3px #243b2b}
+.page-heading h1 {font:700 clamp(34px,calc(3.4vw / var(--zoom,1)),62px)/1.12 var(--display);letter-spacing:-.025em;color:#fff;text-shadow:0 2px 3px #243b2b;-webkit-text-stroke:1px #53651b}
+.page-heading p {color:#fff;font:clamp(17px,calc(1.5vw / var(--zoom,1)),26px)/1.5 var(--display);text-shadow:0 1px 3px #243b2b}
 .heading-actions {position:absolute;right:0;top:calc(100% + 24px)}
 .overview-page .page-heading {margin-bottom:0;min-height:186px}
 .overview-page .heading-actions {position:static;align-self:flex-start}
-.care-stats {position:relative;gap:clamp(16px,2.4vw,44px);margin-bottom:42px}
+.care-stats {position:relative;gap:clamp(16px,calc(2.4vw / var(--zoom,1)),44px);margin-bottom:42px}
 .care-stats .stat {background:#a0b18d;border:3px solid #465538;border-radius:30px;padding:24px;min-height:210px;display:flex;flex-direction:column;justify-content:space-between}
 .care-stats .stat-top {font:20px var(--display);text-transform:uppercase;color:#35422e}
 .care-stats .stat-value {font-size:48px;font-weight:650;color:#3e5033}
@@ -1793,7 +1793,7 @@ dialog::backdrop {
   .login-university strong {font-size:14px}.login-university small {font-size:14px}
 }
 @media(max-width:700px) {
-  .main {--page-gutter:18px;min-height:calc(100svh - 67px)}
+  .main {--page-gutter:18px;min-height:calc(100svh / var(--zoom,1) - 67px)}
   .layout:before {height:245px}.layout:has(.overview-page):before {height:300px}
   .page-heading,.overview-page .page-heading {min-height:178px;padding-block:26px}
   .page-heading h1 {font-size:34px}.page-heading p {font-size:18px}
@@ -1802,7 +1802,7 @@ dialog::backdrop {
   .landing-footer {flex-wrap:wrap}.landing-footer p {max-width:none;font-size:16px}
 }
 @media(max-width:600px) {
-  .login {display:flex}.login-form {min-height:100svh;padding:80px 28px 40px}
+  .login {display:flex}.login-form {min-height:calc(100svh / var(--zoom,1));padding:80px 28px 40px}
   .login-art {min-height:520px}.login-brand {top:22%}
   .login-university small {display:block}.login-photo-copy {bottom:24px}
 }
@@ -1836,7 +1836,7 @@ body {font-size:16px}
 .care-stats .stat-foot {font:600 14px var(--body);text-transform:none}
 .stat:hover {background:#cbdcbd}
 button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3px}
-.stat-plots {padding:0 24px 24px;max-height:65vh;overflow:auto}
+.stat-plots {padding:0 24px 24px;max-height:calc(65vh / var(--zoom,1));overflow:auto}
 .stat-plots a {display:flex;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--line);font-size:16px}
 .stat-plots a strong {overflow-wrap:anywhere}
 .team-row>span:nth-child(2) {min-width:0;overflow-wrap:anywhere}
@@ -1918,7 +1918,7 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
 .map-key .key-icon svg {width:16px;height:16px;margin-right:4px;stroke:none}
 
 /* Landing scene: one looping growth timelapse. Reduced motion shows the grown garden, because full size is the default state. */
-.landing-scene {margin:0;height:max(300px,min(37.5vw,64vh));overflow:hidden}
+.landing-scene {margin:0;height:max(300px,min(calc(37.5vw / var(--zoom,1)),calc(64vh / var(--zoom,1))));overflow:hidden}
 .garden-scene {display:block;width:100%;height:100%;stroke:none;mask-image:linear-gradient(transparent,#000 14%)}
 .scene-soil {fill:#5b4632}
 .scene-plant {animation:scene-grow 24s cubic-bezier(.16,1,.3,1) -3.5s infinite}
@@ -2312,9 +2312,10 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
 .help-body p,.help-body li {margin:0;font-size:15px;line-height:1.5;color:#36472c}
 .help-body ul {margin:4px 0 0;padding-left:20px}
 
-/* Large monitors: scale the whole interface like its ~1440px design instead of shrinking text into empty space. */
-@media screen and (min-width:1700px) {html {zoom:1.15}}
-@media screen and (min-width:1920px) {html {zoom:1.3}}
-@media screen and (min-width:2300px) {html {zoom:1.5}}
-@media screen and (min-width:2800px) {html {zoom:1.8}}
-@media screen and (min-width:3400px) {html {zoom:2.2}}
+/* Large monitors: scale the whole interface like its ~1440px design instead of shrinking text into empty space.
+   Viewport units are scaled by zoom too, so every viewport unit divides by --zoom. */
+@media screen and (min-width:1700px) {html {zoom:1.15;--zoom:1.15}}
+@media screen and (min-width:1920px) {html {zoom:1.3;--zoom:1.3}}
+@media screen and (min-width:2300px) {html {zoom:1.5;--zoom:1.5}}
+@media screen and (min-width:2800px) {html {zoom:1.8;--zoom:1.8}}
+@media screen and (min-width:3400px) {html {zoom:2.2;--zoom:2.2}}
