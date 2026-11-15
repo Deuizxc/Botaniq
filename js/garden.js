@@ -12,13 +12,14 @@ export const plotBounds = plot => plot.map_x == null
   ? mapPosition(plot.map_slot || plot.plot_id)
   : [plot.map_x, plot.map_y, plot.map_w, plot.map_h];
 
-export function dragPlot(bounds, dx, dy, corner = '', height = 100) {
+export function dragPlot(bounds, dx, dy, corner = '', height = 100, width = 100) {
   let [x,y,w,h]=bounds;
   const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
-  if (!corner) return [clamp(x+dx,0,100-w),clamp(y+dy,0,height-h),w,h];
+  w=Math.min(w,width);h=Math.min(h,height);
+  if (!corner) return [clamp(x+dx,0,width-w),clamp(y+dy,0,height-h),w,h];
   const right=x+w,bottom=y+h;
   if (corner.includes('w')) {x=clamp(x+dx,0,right-3);w=right-x;}
-  if (corner.includes('e')) w=clamp(w+dx,3,100-x);
+  if (corner.includes('e')) w=clamp(w+dx,3,width-x);
   if (corner.includes('n')) {y=clamp(y+dy,0,bottom-3);h=bottom-y;}
   if (corner.includes('s')) h=clamp(h+dy,3,height-y);
   return [x,y,w,h];
@@ -73,6 +74,24 @@ export function notificationKeys(state) {
     ? [...state.tasks.filter(t=>t.is_flagged_for_admin).map(t=>`takeover-${t.task_id}`), ...(state.messages||[]).filter(m=>!m.read_at).map(m=>`message-${m.message_id}`), ...state.tasks.filter(t=>needsCover(t,state.today)).map(t=>`cover-${t.task_id}`)]
     : [...assignedPending(state.tasks,state.user.user_id).map(t=>`task-${t.task_id}-${t.scheduled_date}-${t.scheduled_time}`), ...(state.invites||[]).map(i=>`invite-${i.invite_id}`)];
 }
+
+// The greenhouse's own map shape, scaled so its longer side spans the 100-unit bed space (1 x unit = 10px, 1 y unit = 7px).
+export function greenhouseFrame(house) {
+  const [, , w, h] = plotBounds(house);
+  return w >= h ? [100, 100 * h / w] : [100 * w / h, 100];
+}
+
+// Where a bed drawn in the greenhouse view sits on the main garden map, clipped to the greenhouse.
+export function bedOnMap(house, bed) {
+  const [gx, gy, gw, gh] = plotBounds(house), [bx, by, bw, bh] = plotBounds(bed), k = Math.max(gw, gh) / 100;
+  const x = Math.min(gx + bx * k, gx + gw), y = Math.min(gy + by * k, gy + gh);
+  return [x, y, Math.min(bw * k, gx + gw - x), Math.min(bh * k, gy + gh - y)];
+}
+
+// Done tasks leave the task list a week after they were finished; reports still count them.
+export const DONE_DAYS = 7;
+export const recentlyDone = (task, today) => ['Completed', 'Skipped'].includes(task.status)
+  && Date.parse(today) - Date.parse(localDate(task.completed_at) || task.scheduled_date) < DONE_DAYS * 86400000;
 
 export const isGreenhouse = plot => plot.zone === 'Greenhouse' && !plot.parent_plot_id;
 export const isGrowingPlot = plot => !plot.removed_at && plot.zone !== 'Open space' && !isGreenhouse(plot);

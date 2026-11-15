@@ -1,4 +1,4 @@
-import { plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, isGreenhouse, isGrowingPlot, calendarMonth, notificationKeys, needsCover, isMissed, taskSummary, reportPeriod, reportStatus, staffReport, plotOccupancy, plotStatus, growthStage, liveCrop, taskWarnings } from './garden.js';
+import { plotBounds, dragPlot, greenhouseFrame, bedOnMap, recentlyDone, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, isGreenhouse, isGrowingPlot, calendarMonth, notificationKeys, needsCover, isMissed, taskSummary, reportPeriod, reportStatus, staffReport, plotOccupancy, plotStatus, growthStage, liveCrop, taskWarnings } from './garden.js';
 const $ = selector => document.querySelector(selector);
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const paths = {
@@ -30,7 +30,7 @@ let staffFilter = 'all', cropSearch = '', calendarOffset = 0, calendarDate = '',
 let mapPan = {x:0,y:0};
 let reportKind = 'Weekly', reportOffset = 0, reportStaff = 'all';
 const pageNames = {dashboard:'Overview',plots:'Garden plots',tasks:'Maintenance tasks',reports:'Task reports',inventory:'Crop information',staff:'Staff & access',nutrients:'Nutrient log'};
-let editingMap=false, mapPlacing=false, mapEditId=null, mapSaving=false, mapExtent=100;
+let editingMap=false, mapPlacing=false, mapEditId=null, mapSaving=false, mapExtent=100, mapWidth=100;
 const activePlots=()=>state.plots.filter(p=>!p.removed_at);
 let plotTab = 'overview', editingPlot = false, historyQuery = '', historyFertilizer = 'all', historyFrom = '', historyTo = '';
 const selectedPlot = () => state?.plots.find(p => p.plot_id === Number(new URLSearchParams(location.search).get('id')));
@@ -114,7 +114,7 @@ function renderLogin() {
 }
 function shell() {
   const links=[['dashboard','grid'],['tasks','tasks'],['plots','sprout'],['inventory','leaf'],...(isAdmin()?[['reports','report'],['staff','users']]:[])];
-  $('#app').innerHTML=`<aside class="sidebar" id="sidebar"><button class="icon-button sidebar-close" data-action="menu" aria-label="Close navigation">${icon('close')}</button><a class="brand" href="${href('dashboard')}"><img class="brand-logo" src="/img/Logo.png" alt="BotaniQ"></a><div class="workspace">Garden workspace</div><nav class="nav" aria-label="Main navigation">${links.map(([name,ic])=>`<a href="${href(name)}" class="${view===name?'active':''}" ${view===name?'aria-current="page"':''} title="${pageNames[name]}">${icon(ic)}<span>${pageNames[name]}</span></a>`).join('')}</nav><div class="sidebar-bottom"><div class="garden-note">${icon('sprout')}<strong>Small steps. Lasting growth.</strong>Every record helps us care for a greener campus.</div><small>CUAI · QUEZON CITY UNIVERSITY</small></div></aside><div class="layout"><header class="topbar"><button class="icon-button mobile-menu" data-action="menu" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb">Workspace <span>/</span> <strong>${pageNames[view]}</strong></div><div class="top-spacer"></div><label class="search">${icon('search')}<input id="search" type="search" placeholder="Search" aria-label="Search current page" value="${escape(search)}"></label><button class="icon-button" data-action="notifications" aria-label="Notifications">${icon('bell')}</button><div class="profile-wrap"><button class="profile" data-action="account" aria-label="Account settings" aria-expanded="false" aria-controls="profile-menu"><span class="avatar">${escape(initials(state.user.full_name))}</span><div><strong>${escape(state.user.full_name)}</strong><small>${isAdmin()?'Garden administrator':'Garden staff'}</small></div></button><div id="profile-menu" class="profile-menu" hidden><strong>${escape(state.user.full_name)}</strong><span>${escape(state.user.email)}</span>${button('Edit profile','edit-profile','','text','pencil')}${button('Sign out','logout','','text')}</div></div></header><main class="main" id="main"></main></div>`;
+  $('#app').innerHTML=`<aside class="sidebar" id="sidebar"><button class="icon-button sidebar-close" data-action="menu" aria-label="Close navigation">${icon('close')}</button><a class="brand" href="${href('dashboard')}"><img class="brand-logo" src="/img/Logo.png" alt="BotaniQ"></a><div class="workspace">Garden workspace</div><nav class="nav" aria-label="Main navigation">${links.map(([name,ic])=>`<a href="${href(name)}" class="${view===name?'active':''}" ${view===name?'aria-current="page"':''} title="${pageNames[name]}">${icon(ic)}<span>${pageNames[name]}</span></a>`).join('')}</nav><div class="sidebar-bottom"><div class="garden-note">${icon('sprout')}<strong>Small steps. Lasting growth.</strong>Every record helps us care for a greener campus.</div><small>CUAI · QUEZON CITY UNIVERSITY</small></div></aside><div class="layout"><header class="topbar"><button class="icon-button mobile-menu" data-action="menu" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb">Workspace <span>/</span> <strong>${pageNames[view]}</strong></div><div class="top-spacer"></div><label class="search">${icon('search')}<input id="search" type="search" placeholder="Search" aria-label="Search current page" value="${escape(search)}"></label><button class="btn secondary small help-button" data-action="help" aria-haspopup="dialog">How to use</button><button class="icon-button" data-action="notifications" aria-label="Notifications">${icon('bell')}</button><div class="profile-wrap"><button class="profile" data-action="account" aria-label="Account settings" aria-expanded="false" aria-controls="profile-menu"><span class="avatar">${escape(initials(state.user.full_name))}</span><div><strong>${escape(state.user.full_name)}</strong><small>${isAdmin()?'Garden administrator':'Garden staff'}</small></div></button><div id="profile-menu" class="profile-menu" hidden><strong>${escape(state.user.full_name)}</strong><span>${escape(state.user.email)}</span>${button('Edit profile','edit-profile','','text','pencil')}${button('Sign out','logout','','text')}</div></div></header><main class="main" id="main"></main></div>`;
   updateBell();
   $('#search').addEventListener('input',event=>{search=event.target.value;renderMain();});
   renderMain();
@@ -197,6 +197,7 @@ function gardenMap(compact=false) {
       <g class="map-world">
         <rect class="map-ground" x="0" y="0" width="1000" height="${height}" rx="28"/>
         <rect x="0" y="0" width="1000" height="${height}" fill="url(#map-grain)" rx="28"/>
+        ${house?greenhouseOutline(house,plots):''}
         ${house?'':`<path class="map-path-edge" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
         <path class="map-path" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
 
@@ -204,7 +205,7 @@ function gardenMap(compact=false) {
         ${plots.map(mapPlotMarkup).join('')}
       </g>
     </svg></div>
-    <div class="map-bottom"><div class="map-key"><span class="key-missed">Missed task</span><span class="key-care">Needs care today</span><span class="key-growing">Growing</span><span class="key-vacant">Vacant</span><span class="key-house">Greenhouse, open to view beds</span><span class="key-space">Open space</span><span class="key-icon"><svg viewBox="-20 -36 40 38" aria-hidden="true"><use href="#map-seedling"/></svg>Seedling</span><span class="key-icon"><svg viewBox="-30 -56 60 58" aria-hidden="true"><use href="#map-plant"/></svg>Full-grown</span></div><div class="map-controls"><button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button><button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
+    <div class="map-bottom"><div class="map-key"><strong>Colour = status</strong><span class="key-missed">Missed task</span><span class="key-care">Needs care today</span><span class="key-growing">Growing</span><span class="key-vacant">Vacant</span><strong>Shape = type</strong><span class="key-house">${house?'Greenhouse walls':'Greenhouse (tap to see its beds)'}</span><span class="key-nursery">Nursery</span><span class="key-space">Open space</span><span class="key-alert">Task due</span><span class="key-icon"><svg viewBox="-20 -36 40 38" aria-hidden="true"><use href="#map-seedling"/></svg>Seedling</span><span class="key-icon"><svg viewBox="-30 -56 60 58" aria-hidden="true"><use href="#map-plant"/></svg>Full-grown</span></div><div class="map-controls"><button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button><button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
     ${house?`<div class="greenhouse-beds">${plots.map(p=>{const crop=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);return `<button class="greenhouse-bed" data-action="map-plot" data-id="${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(crop?`Occupied · ${crop.crop_name}${crop.variety?' · '+crop.variety:''} · ${growthStage(crop,state.today).label}`:'Vacant · Ready for planting')}</span></button>`;}).join('')||empty(isAdmin()?'No beds yet. Choose Edit map, then Add bed to lay out this greenhouse.':'No beds have been added yet.')}</div>`:''}
     ${compact?'':'<aside id="plot-inspector" class="plot-inspector" aria-label="Selected plot" hidden></aside>'}
   </section>`;
@@ -228,23 +229,31 @@ function mapPlotMarkup(p) {
           const slot=p.map_slot||p.plot_id,[x,y,w,h]=plotBounds(p),c=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);
           const beds=activePlots().filter(b=>b.parent_plot_id===p.plot_id);
           const stage=c&&growthStage(c,state.today).label,caption=isGreenhouse(p)?`${beds.length} bed${beds.length===1?'':'s'}`:p.zone==='Open space'?'No planting':c?`${c.crop_name} · ${stage}`:'Vacant';
-          const status=plotStatus(p,state),thin=h<14,hasCode=w>=17,shape=isGreenhouse(p)?'house':p.zone==='Open space'?'space':'bed';
+          const status=plotStatus(p,state),thin=h<14,hasCode=w>=17,fitsCode=p.plot_code.length*11+16<=w*10,shape=isGreenhouse(p)?'house':p.zone==='Open space'?'space':'bed';
           const texture=isGreenhouse(p)?'house-ribs':p.zone==='Open space'?'paving':p.zone==='Nursery'?'nursery-trays':'bed-rows';
           const occupancy=isGreenhouse(p)?(beds.some(b=>b.occupancy_status==='Occupied')?'Occupied':'Vacant'):p.occupancy_status;
           const muted=!matchesPlot(p);
+          // Beds are drawn inside their greenhouse so the garden map shows exactly what the greenhouse holds.
+          const houseBeds=isGreenhouse(p)?`<g class="house-beds">${beds.map(b=>{const [bx,by,bw,bh]=bedOnMap(p,b);return bw>0&&bh>0?`<rect class="house-bed status-${plotStatus(b,state)}" x="${bx*10+1}" y="${by*7+1}" width="${Math.max(0,bw*10-2)}" height="${Math.max(0,bh*7-2)}" rx="2"/>`:'';}).join('')}</g>`:'';
           return `<g class="map-plot ${p.zone.toLowerCase().replace(' ','-')} ${occupancy.toLowerCase()} ${shape} status-${status} ${muted?'dimmed':''}" data-action="map-plot" data-id="${p.plot_id}" role="button" tabindex="0" aria-pressed="${editingMap&&mapEditId===p.plot_id}" aria-label="Plot ${slot}, ${escape(p.plot_code)}, ${escape(caption)}, ${plotStatusLabels[status]}">
             <title>${escape(p.plot_code)} · ${escape(caption)} · ${p.zone} · ${plotStatusLabels[status]}</title>
             <rect class="plot-shape" x="${x*10}" y="${y*7}" width="${w*10}" height="${h*7}" rx="3"/>
             <rect class="plot-texture" x="${x*10+4}" y="${y*7+4}" width="${w*10-8}" height="${h*7-8}" rx="5" fill="url(#${texture})"/>
             ${plotPlants(c,[x,y,w,h],thin,hasCode)}
-            <text class="map-plot-label ${thin?'thin':''}" x="${thin?x*10+12:(x+w/2)*10}" y="${(y+h/2)*7+(thin?7:5)}">${slot}${hasCode?`<tspan class="map-plot-code"> · ${escape(p.plot_code)}</tspan>`:''}</text>
+            ${houseBeds}
+            <text class="map-plot-label ${thin?'thin':''}" x="${thin?x*10+12:(x+w/2)*10}" y="${(y+h/2)*7+(thin?7:5)}">${hasCode?`<tspan class="map-plot-slot">${slot} · </tspan>${escape(p.plot_code)}`:fitsCode?escape(p.plot_code):slot}</text>
             ${h>=14?`<text class="map-bed-caption" x="${(x+w/2)*10}" y="${(y+h/2)*7+28}">${escape(w<16&&c?c.crop_name:caption)}</text>`:''}
             ${status==='care'||status==='missed'?`<g class="plot-task-alert"><rect x="${(x+w)*10-21}" y="${y*7-8}" width="26" height="26"/><text x="${(x+w)*10-8}" y="${y*7+10}">!</text></g>`:''}
             ${editingMap&&mapEditId===p.plot_id?['nw','ne','sw','se'].map(corner=>`<rect class="plot-handle ${corner}" data-corner="${corner}" x="${(x+(corner.includes('e')?w:0))*10-8}" y="${(y+(corner.includes('s')?h:0))*7-8}" width="16" height="16" rx="3" role="button" tabindex="0" aria-label="Resize ${corner} corner of ${escape(p.plot_code)} with arrow keys"/>`).join(''):''}
           </g>`;
 }
+// The greenhouse walls, sized from its shape on the garden map, so beds are laid out against a real border.
+function greenhouseOutline(house,beds) {
+  const [w,h]=greenhouseFrame(house),outside=beds.filter(b=>{const [x,y,bw,bh]=plotBounds(b);return x+bw>w+.01||y+bh>h+.01;}).length;
+  return `<rect class="greenhouse-outside" x="0" y="0" width="1000" height="700"/><rect class="greenhouse-floor" x="0" y="0" width="${w*10}" height="${h*7}"/><rect class="greenhouse-wall" x="2" y="2" width="${w*10-4}" height="${h*7-4}"/><text class="greenhouse-wall-label" x="${w*10-14}" y="${h*7-14}">${escape(house.plot_code)} walls</text>${outside?`<text class="greenhouse-warning" x="20" y="${Math.min(690,h*7+34)}">${outside} bed${outside===1?' is':'s are'} outside the walls. ${isAdmin()?'Edit map and drag it inside.':''}</text>`:''}`;
+}
 function mapEditorToolbar() {
-  return `<div class="map-edit-toolbar" aria-label="Map editing controls"><strong>Edit map</strong><span>Drag a plot to move it. Drag a corner to resize.</span>${button(mapPlacing?'Cancel placement':greenhouse()?'Add bed':'Add plot',mapPlacing?'map-place-cancel':'new-plot','','secondary small','plus')}<p id="map-edit-status" role="status">${mapPlacing?'Click an empty map space, or focus the map and press Enter, to place your new plot.':'Select a plot to edit its layout. Changes save when you release.'}</p><div id="map-edit-selection"></div></div>`;
+  return `<div class="map-edit-toolbar" aria-label="Map editing controls"><strong>${greenhouse()?'Edit greenhouse beds':'Edit map'}</strong><span>${greenhouse()?'1. Add bed, then click inside the dashed walls. 2. Drag a bed to move it, drag a corner to resize. Beds always stay inside the walls.':'Drag a plot to move it. Drag a corner to resize.'}</span>${button(mapPlacing?'Cancel placement':greenhouse()?'Add bed':'Add plot',mapPlacing?'map-place-cancel':'new-plot','','secondary small','plus')}<p id="map-edit-status" role="status">${mapPlacing?'Click an empty map space, or focus the map and press Enter, to place your new plot.':'Select a plot to edit its layout. Changes save when you release.'}</p><div id="map-edit-selection"></div></div>`;
 }
 function paintMapPlot(p,bounds=plotBounds(p)) {
   const [map_x,map_y,map_w,map_h]=bounds;
@@ -278,7 +287,7 @@ async function savePlotBounds(p,bounds) {
 function placeMapPlot(point) {
   if(!editingMap||!mapPlacing||!isAdmin())return;
   const house=greenhouse();
-  const bounds=dragPlot([0,0,house?30:15,house?20:10],point.x/10-(house?15:7.5),point.y/7-(house?10:5),'',mapExtent);
+  const bounds=dragPlot([0,0,house?30:15,house?20:10],point.x/10-(house?15:7.5),point.y/7-(house?10:5),'',mapExtent,mapWidth);
   modal(house?'Add a greenhouse bed':'Add a garden plot','Place and resize rectangular spaces in Edit map. Greenhouses contain individual growing beds; open spaces contain no plants.',`${field(house?'Bed code':'Plot code','plot_code','text','','required maxlength="30" placeholder="e.g. GH-03-B2"')}${house?'':select('Space type','zone',options(['Greenhouse','Outdoor','Nursery','Open space'].map(x=>({x})),'x','x'))}`,'plots',{bounds,...(house?{zone:'Greenhouse',parent_plot_id:house.plot_id}:{})});
   mapPlacing=false;$('.garden-map')?.classList.remove('placing-plot');
   $('#map-edit-status').textContent='Complete the form to add this plot.';
@@ -305,7 +314,7 @@ function mountGardenMap() {
     if(!drag.moved&&Math.hypot(dx,dy)<6)return;
     drag.moved=true;svg.setPointerCapture(event.pointerId);svg.classList.add('panning');
     if(drag.p) {
-      drag.next=dragPlot(drag.bounds,dx/10,dy/7,drag.corner,mapExtent);
+      drag.next=dragPlot(drag.bounds,dx/10,dy/7,drag.corner,mapExtent,mapWidth);
       paintMapPlot(drag.p,drag.next);
     } else {mapPan={x:drag.pan.x+dx,y:drag.pan.y+dy};zoomMap(editingMap?null:selectedPlot());}
   });
@@ -338,7 +347,7 @@ function mountGardenMap() {
     if(editingMap&&el) {
       if(mapSaving||mapPlacing)return;
       const p=activePlots().find(p=>p.plot_id===Number(el.dataset.id)),corner=event.target.dataset.corner||'';
-      const bounds=dragPlot(plotBounds(p),delta[0],delta[1],corner,mapExtent);
+      const bounds=dragPlot(plotBounds(p),delta[0],delta[1],corner,mapExtent,mapWidth);
       paintMapPlot(p,bounds);
       document.querySelector(`.map-plot[data-id="${p.plot_id}"]${corner?` [data-corner="${corner}"]`:''}`)?.focus({preventScroll:true});
       savePlotBounds(p,bounds);
@@ -492,9 +501,9 @@ function taskDetails(t) {
 }
 function tasksPage() {
   const scoped=state.tasks.filter(t=>isAdmin()?(staffFilter==='all'||String(t.assigned_staff_id)===staffFilter):t.assigned_staff_id===state.user.user_id);
-  const tasks=scoped.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||'',t.substitute_staff||''])&&(taskFilter==='Done'?['Completed','Skipped'].includes(t.status):taskFilter==='Missed'?isMissed(t,state.today):t.status==='Pending'));
+  const tasks=scoped.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||'',t.substitute_staff||''])&&(taskFilter==='Done'?recentlyDone(t,state.today):taskFilter==='Missed'?isMissed(t,state.today):t.status==='Pending'));
   const quietToday=!isAdmin()&&taskFilter==='Open'&&!search&&!scoped.some(t=>t.status==='Pending'&&t.scheduled_date<=state.today);
-  return heading('Maintenance tasks','Dated care, with missed tasks shown first.',isAdmin()?button('Schedule task','new-task','','','plus'):'')+`<section class="task-board"><div class="task-toolbar">${filters(['Open','Missed','Done'],taskFilter,'task-filter')}${!isAdmin()?'My tasks':`<label class="task-scope">Show<select id="staff-filter"><option value="all">All team assignments</option>${options(state.users.filter(u=>u.role==='Staff'),'user_id','full_name',staffFilter)}</select></label>`}</div>${quietToday?empty('Nothing due today. Your garden is in good hands.'):''}${tasks.map(taskDetails).join('')||(!quietToday?empty('No '+taskFilter.toLowerCase()+' tasks match this view.'):'')}</section>${isAdmin()?'<button class="task-fab" data-action="new-task" aria-label="Schedule a task">'+icon('plus')+'</button>':''}`;
+  return heading('Maintenance tasks','Dated care, with missed tasks shown first.',isAdmin()?button('Schedule task','new-task','','','plus'):'')+`<section class="task-board"><div class="task-toolbar">${filters(['Open','Missed','Done'],taskFilter,'task-filter')}${!isAdmin()?'My tasks':`<label class="task-scope">Show<select id="staff-filter"><option value="all">All team assignments</option>${options(state.users.filter(u=>u.role==='Staff'),'user_id','full_name',staffFilter)}</select></label>`}</div>${taskFilter==='Done'?'<p class="muted task-note">Done tasks clear from this list after 7 days. They stay in Task reports.</p>':''}${quietToday?empty('Nothing due today. Your garden is in good hands.'):''}${tasks.map(taskDetails).join('')||(!quietToday?empty('No '+taskFilter.toLowerCase()+' tasks match this view.'):'')}</section>${isAdmin()?'<button class="task-fab" data-action="new-task" aria-label="Schedule a task">'+icon('plus')+'</button>':''}`;
 }
 function reportNote(t) {
   if(t.covered_for)return `Taken over from ${t.covered_for}${t.takeover_reason?`: ${t.takeover_reason}`:''}`;
@@ -624,6 +633,19 @@ function updateBell() {
   bell.setAttribute('aria-label',`Notifications, ${count} unread`);
   bell.innerHTML=icon('bell')+(count?`<span class="notification-count" aria-hidden="true">${count}</span>`:'');
 }
+// One place a new owner or staff member can read how the workspace fits together, starting with the page they are on.
+function help() {
+  const admin=isAdmin(),pages={
+    dashboard:['Overview','Today at a glance: tasks due, missed work and plots that need water, fertilizer or harvest. Tap any item to jump to it.'],
+    tasks:['Maintenance tasks',`Open shows work still to do, Missed shows overdue work, Done shows the last 7 days of finished work (older work stays in Task reports). Tap a task to see details${admin?', reassign or delete it':', mark it complete, ask for cover or message an admin'}.`],
+    plots:['Garden plots',`Each rectangle is a space in the garden. Colour shows status (red missed, yellow due today, green growing, brown vacant); the label is the plot code used on tasks. Greenhouses show their beds inside; tap one to open it.${admin?' Edit map lets you drag plots to move them and drag corners to resize. Inside a greenhouse, the dashed line is its walls and new beds must fit inside it.':''}`],
+    inventory:['Crop information','The crop catalogue: varieties, notes and growing information used when planting.'],
+    reports:['Task reports','Weekly or monthly completion for each staff member, including missed, skipped and taken-over work.'],
+    staff:['Staff and access','Add accounts, change roles and turn access off for people who leave.']
+  },order=[view,...Object.keys(pages).filter(k=>k!==view)].filter(k=>pages[k]&&(admin||!['reports','staff'].includes(k)));
+  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">How to use BotaniQ</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="help-body"><p>${admin?'As an admin you lay out the garden, plant crops and schedule care tasks for staff.':'As staff you receive care tasks, complete them on the day, and ask for cover when you cannot.'} Use the menu on the left to move between pages and the search box to filter the page you are on.</p>${order.map((k,i)=>`<section><h3>${i===0?'This page: ':''}${pages[k][0]}</h3><p>${pages[k][1]}</p></section>`).join('')}</div>`;
+  if(!$('#modal').open)$('#modal').showModal();
+}
 function notifications() {
   if(!isAdmin()) {
     const dialog=$('#modal');
@@ -653,7 +675,7 @@ document.addEventListener('click',async event=>{
     if(mapSaving&&['map-edit','new-plot','remove-plot','map-place-cancel'].includes(action))return;
     if(action==='map-edit') {
       if(!isAdmin()||mapSaving)return;
-      if(!editingMap){closeMapPlot();mapExtent=greenhouse()?100:Math.min(1000,Math.max(120,...mapPlots().map(p=>{const [,y,,h]=plotBounds(p);return y+h+15;})));}
+      if(!editingMap){closeMapPlot();const house=greenhouse();[mapWidth,mapExtent]=house?greenhouseFrame(house):[100,Math.min(1000,Math.max(120,...mapPlots().map(p=>{const [,y,,h]=plotBounds(p);return y+h+15;})))];}
       editingMap=!editingMap;mapPlacing=false;mapEditId=null;renderMain();return;
     }
     if(action==='map-place-cancel'){mapPlacing=false;renderMain();return;}
@@ -678,6 +700,7 @@ document.addEventListener('click',async event=>{
     if(action==='calendar-day'){calendarDate=calendarDate===id?'':id;renderMain();return;}
     if(action==='calendar-clear'){calendarDate='';renderMain();return;}
     if(action==='my-tasks'){$('#modal').close();taskFilter='Open';navigate('tasks.html');return;}
+    if(action==='help'){help();return;}
     if(action==='notifications'){notifications();return;}
     if(action==='read-invite'){target.disabled=true;await api('read-invite',{invite_id:Number(id)});await refresh();notifications();return;}
     if(action==='read-message'){target.disabled=true;await api('read-message',{message_id:Number(id)});await refresh();notifications();toast('Message marked as read.');return;}

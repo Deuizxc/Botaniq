@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapPosition, plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, calendarMonth, notificationKeys, growthStage, plotOccupancy, plotStatus, taskWarnings, taskSummary, reportPeriod, staffReport } from '../js/garden.js';
+import { mapPosition, plotBounds, dragPlot, plotOverview, plotHistory, filterHistory, assignedPending, taskDateLabel, dailyProgress, overviewPlots, calendarMonth, notificationKeys, growthStage, plotOccupancy, plotStatus, taskWarnings, taskSummary, reportPeriod, staffReport, greenhouseFrame, bedOnMap, recentlyDone } from '../js/garden.js';
 
 const plot={plot_id:1,plot_code:'GH-01'};
 const cycle={cycle_id:1,current_plot_id:1,origin_plot_id:1,crop_name:'Tomato',planted_date:'2026-01-01',harvest_date:'2026-02-01'};
@@ -166,4 +166,22 @@ test('staff report counts each outcome and credits taken-over work to the new ow
   assert.deepEqual([report.assigned,report.completed,report.missed,report.ongoing,report.takenOver,report.rate],[4,1,2,1,1,33]);
   assert.equal(staffReport(rows,3,{from:'2026-11-02',to:'2026-11-30'},'2026-11-07').handedOver,1);
   assert.equal(staffReport([],2,{from:'2026-11-02',to:'2026-11-08'},'2026-11-07').rate,null);
+});
+
+test('greenhouse beds keep the greenhouse shape and scale onto the garden map',()=>{
+  const wide={map_x:10,map_y:20,map_w:40,map_h:20},tall={map_x:0,map_y:0,map_w:10,map_h:20};
+  assert.deepEqual(greenhouseFrame(wide),[100,50]);
+  assert.deepEqual(greenhouseFrame(tall),[50,100]);
+  assert.deepEqual(bedOnMap(wide,{map_x:50,map_y:25,map_w:50,map_h:25}),[30,30,20,10]);
+  assert.deepEqual(bedOnMap(wide,{map_x:90,map_y:40,map_w:30,map_h:30}),[46,36,4,4]);
+  assert.deepEqual(dragPlot([10,10,30,30],100,100,'',50,60),[30,20,30,30]);
+});
+
+test('done tasks drop off the list a week after completion',()=>{
+  const done=(completed_at,status='Completed')=>({status,completed_at,scheduled_date:'2026-11-01'});
+  assert.equal(recentlyDone(done('2026-11-09T02:00:00.000Z'),'2026-11-15'),true);
+  assert.equal(recentlyDone(done('2026-11-08T02:00:00.000Z'),'2026-11-15'),false);
+  assert.equal(recentlyDone(done(null,'Skipped'),'2026-11-07'),true);
+  assert.equal(recentlyDone(done(null,'Skipped'),'2026-11-08'),false);
+  assert.equal(recentlyDone({status:'Pending',scheduled_date:'2026-11-15'},'2026-11-15'),false);
 });
