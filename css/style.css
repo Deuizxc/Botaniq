@@ -2297,7 +2297,6 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
 .house-bed.status-growing {fill:#a5cf80}
 .house-bed.status-care {fill:#f4c751}
 .house-bed.status-missed {fill:#e8806a}
-.greenhouse-outside {fill:#c9cfc2}
 .greenhouse-floor {fill:#eef4ee}
 .greenhouse-wall {fill:none;stroke:#4f6f5a;stroke-width:5;stroke-dasharray:18 6;pointer-events:none}
 .greenhouse-wall-label {fill:#4f6f5a;font-size:16px;font-weight:650;text-anchor:end;pointer-events:none}
@@ -2319,3 +2318,7 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
 @media screen and (min-width:2300px) {html {zoom:1.5;--zoom:1.5}}
 @media screen and (min-width:2800px) {html {zoom:1.8;--zoom:1.8}}
 @media screen and (min-width:3400px) {html {zoom:2.2;--zoom:2.2}}
+/* Greenhouse view: the canvas is the greenhouse itself, sized to its shape, with no panning. */
+.greenhouse-view .map-viewport {height:auto;max-height:calc(70vh / var(--zoom,1))}
+.greenhouse-view .map-svg {height:auto;max-height:calc(70vh / var(--zoom,1));cursor:default}
+.greenhouse-view.editing-map .map-svg {cursor:copy}

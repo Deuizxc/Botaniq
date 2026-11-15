@@ -183,17 +183,19 @@ function plotsPage() {
 // Inside a greenhouse the one button adds a bed, or edits the bed you have open.
 function mapEditButton() {
   const bed=greenhouse()&&selectedPlot()?.parent_plot_id?selectedPlot():null;
-  if(editingMap)return button(greenhouse()?'Done editing beds':'Done editing map','map-edit','','','check');
-  return greenhouse()?button(bed?`Edit ${escape(bed.plot_code)}`:'Add bed','map-edit','','',bed?'pencil':'plus'):button('Edit map','map-edit','','','pencil');
+  if(editingMap)return button(greenhouse()?'Done editing greenhouse':'Done editing map','map-edit','','','check');
+  return greenhouse()?button(bed?`Edit ${escape(bed.plot_code)}`:'Edit greenhouse','map-edit','','','pencil'):button('Edit map','map-edit','','','pencil');
 }
 const syncMapEditButton=()=>{const slot=$('#map-edit-slot');if(slot)slot.innerHTML=mapEditButton();};
 function gardenMap(compact=false) {
   const house=greenhouse(),plots=mapPlots();
-  const height=(house?100:editingMap?mapExtent:Math.max(100,...plots.map(p=>{const [,y,,h]=plotBounds(p);return y+h+5;})))*7;
-  return `<section class="garden-map ${compact?'compact':''} ${editingMap?'editing-map':''} ${mapPlacing?'placing-plot':''}" aria-label="Interactive garden map">
+  // A greenhouse view is exactly the greenhouse: the canvas is its walls, with nothing outside to pan to.
+  const [frameW,frameH]=house?greenhouseFrame(house):[100,100],width=frameW*10;
+  const height=(house?frameH:editingMap?mapExtent:Math.max(100,...plots.map(p=>{const [,y,,h]=plotBounds(p);return y+h+5;})))*7;
+  return `<section class="garden-map ${house?'greenhouse-view':''} ${compact?'compact':''} ${editingMap?'editing-map':''} ${mapPlacing?'placing-plot':''}" aria-label="Interactive garden map">
     ${editingMap?mapEditorToolbar():''}
     <div class="map-caption"><span class="eyebrow">CUAI / Garden atlas</span><label class="map-picker"><span class="sr-only">Choose a plot</span><select id="map-picker"><option value="">Choose a plot…</option>${[...plots].sort((a,b)=>a.map_slot-b.map_slot).map(p=>`<option value="${p.plot_id}" ${selectedPlot()?.plot_id===p.plot_id?'selected':''}>${p.map_slot?`${p.map_slot} · `:''}${escape(p.plot_code)}</option>`).join('')}</select></label><span>${icon('sprout')} Tap a space. See what’s growing.</span></div>
-    <div class="map-viewport"><svg class="map-svg" viewBox="0 0 1000 ${height}" aria-label="Garden plots. Drag or use arrow keys to move the map." role="group" tabindex="0">
+    <div class="map-viewport"><svg class="map-svg" viewBox="0 0 ${width} ${height}" aria-label="${house?`Beds inside ${escape(house.plot_code)}`:'Garden plots. Drag or use arrow keys to move the map.'}" role="group" tabindex="0">
       <defs><pattern id="map-grain" width="24" height="24" patternUnits="userSpaceOnUse"><rect x="2" y="2" width="2" height="2" fill="#a8b99b" opacity=".3"/></pattern>
       <pattern id="bed-rows" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M0 7h14" stroke="#3b2a18" opacity=".16" stroke-width="2"/></pattern>
       <pattern id="house-ribs" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M13 0v26" stroke="#fff" opacity=".6" stroke-width="3.5"/></pattern>
@@ -202,8 +204,8 @@ function gardenMap(compact=false) {
       <g id="map-seedling"><path fill="#2f6b2c" d="M-1 0C-2-8-1-14 0-20 1-14 2-8 1 0Z"/><path fill="#3f8a35" d="M0-16C-10-16-17-22-18-32-8-33 0-26 0-16ZM0-20C8-20 14-26 15-34 6-35 0-29 0-20Z"/></g>
       <g id="map-plant"><path fill="#2f6b2c" d="M0 0C-20-5-30-24-20-42-8-34-2-16 0 0Z"/><path fill="#3a7d30" d="M0 0C20-5 30-24 20-42 8-34 2-16 0 0Z"/><path fill="#4c9a3d" d="M0 0C-11-14-11-38 0-54 11-38 11-14 0 0Z"/></g></defs>
       <g class="map-world">
-        <rect class="map-ground" x="0" y="0" width="1000" height="${height}" rx="28"/>
-        <rect x="0" y="0" width="1000" height="${height}" fill="url(#map-grain)" rx="28"/>
+        <rect class="map-ground" x="0" y="0" width="${width}" height="${height}" rx="${house?0:28}"/>
+        <rect x="0" y="0" width="${width}" height="${height}" fill="url(#map-grain)" rx="${house?0:28}"/>
         ${house?greenhouseOutline(house,plots):''}
         ${house?'':`<path class="map-path-edge" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
         <path class="map-path" d="M730 10V680M20 145H730M450 145V275M20 540H730"/>
@@ -212,7 +214,7 @@ function gardenMap(compact=false) {
         ${plots.map(mapPlotMarkup).join('')}
       </g>
     </svg></div>
-    <div class="map-bottom"><div class="map-key"><strong>Colour = status</strong><span class="key-missed">Missed task</span><span class="key-care">Needs care today</span><span class="key-growing">Growing</span><span class="key-vacant">Vacant</span><strong>Shape = type</strong><span class="key-house">${house?'Greenhouse walls':'Greenhouse (tap to see its beds)'}</span><span class="key-nursery">Nursery</span><span class="key-space">Open space</span><span class="key-alert">Task due</span><span class="key-icon"><svg viewBox="-20 -36 40 38" aria-hidden="true"><use href="#map-seedling"/></svg>Seedling</span><span class="key-icon"><svg viewBox="-30 -56 60 58" aria-hidden="true"><use href="#map-plant"/></svg>Full-grown</span></div><div class="map-controls"><button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button><button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
+    <div class="map-bottom"><div class="map-key"><strong>Colour = status</strong><span class="key-missed">Missed task</span><span class="key-care">Needs care today</span><span class="key-growing">Growing</span><span class="key-vacant">Vacant</span><strong>Shape = type</strong><span class="key-house">${house?'Greenhouse walls':'Greenhouse (tap to see its beds)'}</span><span class="key-nursery">Nursery</span><span class="key-space">Open space</span><span class="key-alert">Task due</span><span class="key-icon"><svg viewBox="-20 -36 40 38" aria-hidden="true"><use href="#map-seedling"/></svg>Seedling</span><span class="key-icon"><svg viewBox="-30 -56 60 58" aria-hidden="true"><use href="#map-plant"/></svg>Full-grown</span></div><div class="map-controls">${house?'':'<button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button>'}<button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
     ${house?`<div class="greenhouse-beds">${plots.map(p=>{const crop=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);return `<button class="greenhouse-bed" data-action="map-plot" data-id="${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(crop?`Occupied · ${crop.crop_name}${crop.variety?' · '+crop.variety:''} · ${growthStage(crop,state.today).label}`:'Vacant · Ready for planting')}</span></button>`;}).join('')||empty(isAdmin()?'No beds yet. Choose Edit map, then Add bed to lay out this greenhouse.':'No beds have been added yet.')}</div>`:''}
     ${compact?'':'<aside id="plot-inspector" class="plot-inspector" aria-label="Selected plot" hidden></aside>'}
   </section>`;
@@ -257,10 +259,10 @@ function mapPlotMarkup(p) {
 // The greenhouse walls, sized from its shape on the garden map, so beds are laid out against a real border.
 function greenhouseOutline(house,beds) {
   const [w,h]=greenhouseFrame(house),outside=beds.filter(b=>{const [x,y,bw,bh]=plotBounds(b);return x+bw>w+.01||y+bh>h+.01;}).length;
-  return `<rect class="greenhouse-outside" x="0" y="0" width="1000" height="700"/><rect class="greenhouse-floor" x="0" y="0" width="${w*10}" height="${h*7}"/><rect class="greenhouse-wall" x="2" y="2" width="${w*10-4}" height="${h*7-4}"/><text class="greenhouse-wall-label" x="${w*10-14}" y="${h*7-14}">${escape(house.plot_code)} walls</text>${outside?`<text class="greenhouse-warning" x="20" y="${Math.min(690,h*7+34)}">${outside} bed${outside===1?' is':'s are'} outside the walls. ${isAdmin()?'Edit map and drag it inside.':''}</text>`:''}`;
+  return `<rect class="greenhouse-floor" x="0" y="0" width="${w*10}" height="${h*7}"/><rect class="greenhouse-wall" x="2" y="2" width="${w*10-4}" height="${h*7-4}"/><text class="greenhouse-wall-label" x="${w*10-14}" y="${h*7-14}">${escape(house.plot_code)} walls</text>${outside?`<text class="greenhouse-warning" x="16" y="${h*7-14}">${outside} bed${outside===1?' is':'s are'} outside the walls. ${isAdmin()?'Edit map and drag it inside.':''}</text>`:''}`;
 }
 function mapEditorToolbar() {
-  return `<div class="map-edit-toolbar" aria-label="Map editing controls"><strong>${greenhouse()?'Edit greenhouse beds':'Edit map'}</strong><span>${greenhouse()?'Tap an empty spot inside the dashed walls to add a bed there. Tap a bed to move, resize or remove it. Beds always stay inside the walls.':'Drag a plot to move it. Drag a corner to resize.'}</span>${button(mapPlacing?'Cancel placement':greenhouse()?'Add bed':'Add plot',mapPlacing?'map-place-cancel':'new-plot','','secondary small','plus')}<p id="map-edit-status" role="status">${mapPlacing?`Tap where the new ${greenhouse()?'bed':'plot'} should go (or focus the map and press Enter).`:'Changes save as soon as you let go.'}</p><div id="map-edit-selection"></div></div>`;
+  return `<div class="map-edit-toolbar" aria-label="Map editing controls"><strong>${greenhouse()?'Edit greenhouse':'Edit map'}</strong><span>${greenhouse()?'Tap an empty spot inside the dashed walls to add a bed there. Tap a bed to move, resize or remove it. Beds always stay inside the walls.':'Drag a plot to move it. Drag a corner to resize.'}</span>${button(mapPlacing?'Cancel placement':greenhouse()?'Add bed':'Add plot',mapPlacing?'map-place-cancel':'new-plot','','secondary small','plus')}<p id="map-edit-status" role="status">${mapPlacing?`Tap where the new ${greenhouse()?'bed':'plot'} should go (or focus the map and press Enter).`:'Changes save as soon as you let go.'}</p><div id="map-edit-selection"></div></div>`;
 }
 function paintMapPlot(p,bounds=plotBounds(p)) {
   const [map_x,map_y,map_w,map_h]=bounds;
@@ -313,7 +315,7 @@ function mountGardenMap() {
       const corner=event.target.dataset.corner||'';
       selectMapEdit(p.plot_id);
       drag={start:point(event,true),p,bounds:plotBounds(p),corner,moved:false,pointerId:event.pointerId};
-    } else drag={start:point(event),pan:{...mapPan},moved:false,pointerId:event.pointerId};
+    } else if(!greenhouse()) drag={start:point(event),pan:{...mapPan},moved:false,pointerId:event.pointerId};
   });
   svg.addEventListener('pointermove',event=>{
     if(!drag||event.pointerId!==drag.pointerId)return;
@@ -360,7 +362,7 @@ function mountGardenMap() {
       paintMapPlot(p,bounds);
       document.querySelector(`.map-plot[data-id="${p.plot_id}"]${corner?` [data-corner="${corner}"]`:''}`)?.focus({preventScroll:true});
       savePlotBounds(p,bounds);
-    } else {mapPan.x-=delta[0]*60;mapPan.y-=delta[1]*60;zoomMap(editingMap?null:selectedPlot());}
+    } else if(!greenhouse()) {mapPan.x-=delta[0]*60;mapPan.y-=delta[1]*60;zoomMap(editingMap?null:selectedPlot());}
   });
   $('#map-picker')?.addEventListener('change',event=>{if(editingMap)selectMapEdit(Number(event.target.value));else if(event.target.value)selectMapPlot(Number(event.target.value));else closeMapPlot();});
   zoomMap(editingMap?null:selectedPlot());
@@ -373,6 +375,7 @@ function zoomMap(p) {
   if($('#map-picker'))$('#map-picker').value=selectedId||'';
   document.querySelectorAll('.map-plot').forEach(el=>el.setAttribute('aria-pressed',String(Number(el.dataset.id)===selectedId)));
   $('.garden-map').classList.toggle('has-selection',Boolean(p&&!p.removed_at));
+  if(greenhouse()){world.style.transform='';if(p)$('#plot-inspector')?.classList.toggle('on-left',plotBounds(p)[0]>55);return;}
   if(!p||p.removed_at){world.style.transform=mapZoom===1&&!mapPan.x&&!mapPan.y?'':`translate(${500-500*mapZoom+mapPan.x}px,${350-350*mapZoom+mapPan.y}px) scale(${mapZoom})`;return;}
   const [x,y,w,h]=plotBounds(p),left=x>55;
   const mobile=matchMedia('(max-width: 700px)').matches;
@@ -686,7 +689,7 @@ document.addEventListener('click',async event=>{
       if(!isAdmin()||mapSaving)return;
       const house=greenhouse(),bed=house&&!editingMap&&selectedPlot()?.parent_plot_id?selectedPlot().plot_id:null;
       if(!editingMap){closeMapPlot();[mapWidth,mapExtent]=house?greenhouseFrame(house):[100,Math.min(1000,Math.max(120,...mapPlots().map(p=>{const [,y,,h]=plotBounds(p);return y+h+15;})))];}
-      editingMap=!editingMap;mapPlacing=Boolean(editingMap&&house&&!bed);mapEditId=bed;renderMain();return;
+      editingMap=!editingMap;mapPlacing=false;mapEditId=bed;renderMain();return;
     }
     if(action==='map-place-cancel'){mapPlacing=false;renderMain();return;}
     if(action==='map-plot'){if(editingMap)selectMapEdit(Number(id));else selectMapPlot(Number(id));return;}
