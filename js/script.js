@@ -198,7 +198,7 @@ function gardenMap(compact=false) {
     <div class="map-viewport"><svg class="map-svg" viewBox="0 0 ${width} ${height}" aria-label="${house?`Beds inside ${escape(house.plot_code)}`:'Garden plots. Drag or use arrow keys to move the map.'}" role="group" tabindex="0">
       <defs><pattern id="map-grain" width="24" height="24" patternUnits="userSpaceOnUse"><rect x="2" y="2" width="2" height="2" fill="#a8b99b" opacity=".3"/></pattern>
       <pattern id="bed-rows" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M0 7h14" stroke="#3b2a18" opacity=".16" stroke-width="2"/></pattern>
-      <pattern id="house-ribs" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M13 0v26" stroke="#fff" opacity=".6" stroke-width="3.5"/></pattern>
+      <pattern id="house-ribs" width="30" height="22" patternUnits="userSpaceOnUse"><path d="M15 0v22M0 11h30" stroke="#fff" opacity=".75" stroke-width="2"/></pattern>
       <pattern id="nursery-trays" width="18" height="18" patternUnits="userSpaceOnUse"><rect x="2" y="2" width="14" height="14" fill="none" stroke="#2f4a25" opacity=".24" stroke-width="1.5"/></pattern>
       <pattern id="paving" width="40" height="20" patternUnits="userSpaceOnUse"><path d="M0 .5h40M0 10.5h40M.5 0v10M20.5 10v10" stroke="#697162" opacity=".32" fill="none"/></pattern>
       <g id="map-seedling"><path fill="#2f6b2c" d="M-1 0C-2-8-1-14 0-20 1-14 2-8 1 0Z"/><path fill="#3f8a35" d="M0-16C-10-16-17-22-18-32-8-33 0-26 0-16ZM0-20C8-20 14-26 15-34 6-35 0-29 0-20Z"/></g>
@@ -243,14 +243,14 @@ function mapPlotMarkup(p) {
           const occupancy=isGreenhouse(p)?(beds.some(b=>b.occupancy_status==='Occupied')?'Occupied':'Vacant'):p.occupancy_status;
           const muted=!matchesPlot(p);
           // Beds are drawn inside their greenhouse so the garden map shows exactly what the greenhouse holds.
-          const houseBeds=isGreenhouse(p)?`<g class="house-beds">${beds.map(b=>{const [bx,by,bw,bh]=bedOnMap(p,b);return bw>0&&bh>0?`<rect class="house-bed status-${plotStatus(b,state)}" x="${bx*10+1}" y="${by*7+1}" width="${Math.max(0,bw*10-2)}" height="${Math.max(0,bh*7-2)}" rx="2"/>`:'';}).join('')}</g>`:'';
+          const houseBeds=isGreenhouse(p)?`<g class="house-beds">${beds.map(b=>{const [bx,by,bw,bh]=bedOnMap(p,b);return bw>0&&bh>0?`<rect class="house-bed status-${plotStatus(b,state)}" x="${bx*10+1}" y="${by*7+1}" width="${Math.max(0,bw*10-2)}" height="${Math.max(0,bh*7-2)}" rx="2"/><rect class="house-bed-rows" x="${bx*10+1}" y="${by*7+1}" width="${Math.max(0,bw*10-2)}" height="${Math.max(0,bh*7-2)}" rx="2" fill="url(#bed-rows)"/>`:'';}).join('')}</g>`:'';
           return `<g class="map-plot ${p.zone.toLowerCase().replace(' ','-')} ${occupancy.toLowerCase()} ${shape} status-${status} ${muted?'dimmed':''}" data-action="map-plot" data-id="${p.plot_id}" role="button" tabindex="0" aria-pressed="${editingMap&&mapEditId===p.plot_id}" aria-label="Plot ${slot}, ${escape(p.plot_code)}, ${escape(caption)}, ${plotStatusLabels[status]}">
             <title>${escape(p.plot_code)} · ${escape(caption)} · ${p.zone} · ${plotStatusLabels[status]}</title>
             <rect class="plot-shape" x="${x*10}" y="${y*7}" width="${w*10}" height="${h*7}" rx="3"/>
             <rect class="plot-texture" x="${x*10+4}" y="${y*7+4}" width="${w*10-8}" height="${h*7-8}" rx="5" fill="url(#${texture})"/>
             ${plotPlants(c,[x,y,w,h],thin,hasCode)}
             ${houseBeds}
-            <text class="map-plot-label ${thin?'thin':''}" x="${thin?x*10+12:(x+w/2)*10}" y="${(y+h/2)*7+(thin?7:5)}">${hasCode?`<tspan class="map-plot-slot">${slot} · </tspan>${escape(p.plot_code)}`:fitsCode?escape(p.plot_code):slot}</text>
+            <rect class="map-label-plate" rx="5"/><text class="map-plot-label ${thin?'thin':''}" data-code="${escape(p.plot_code)}" data-slot="${slot}" x="${thin?x*10+12:(x+w/2)*10}" y="${(y+h/2)*7+(thin?7:5)}">${hasCode?`<tspan class="map-plot-slot">${slot} · </tspan>${escape(p.plot_code)}`:fitsCode?escape(p.plot_code):slot}</text>
             ${h>=14?`<text class="map-bed-caption" x="${(x+w/2)*10}" y="${(y+h/2)*7+28}">${escape(w<16&&c?c.crop_name:caption)}</text>`:''}
             ${status==='care'||status==='missed'?`<g class="plot-task-alert"><rect x="${(x+w)*10-21}" y="${y*7-8}" width="26" height="26"/><text x="${(x+w)*10-8}" y="${y*7+10}">!</text></g>`:''}
             ${editingMap&&mapEditId===p.plot_id?['nw','ne','sw','se'].map(corner=>`<rect class="plot-handle ${corner}" data-corner="${corner}" x="${(x+(corner.includes('e')?w:0))*10-8}" y="${(y+(corner.includes('s')?h:0))*7-8}" width="16" height="16" rx="3" role="button" tabindex="0" aria-label="Resize ${corner} corner of ${escape(p.plot_code)} with arrow keys"/>`).join(''):''}
@@ -259,7 +259,7 @@ function mapPlotMarkup(p) {
 // The greenhouse walls, sized from its shape on the garden map, so beds are laid out against a real border.
 function greenhouseOutline(house,beds) {
   const [w,h]=greenhouseFrame(house),outside=beds.filter(b=>{const [x,y,bw,bh]=plotBounds(b);return x+bw>w+.01||y+bh>h+.01;}).length;
-  return `<rect class="greenhouse-floor" x="0" y="0" width="${w*10}" height="${h*7}"/><rect class="greenhouse-wall" x="2" y="2" width="${w*10-4}" height="${h*7-4}"/><text class="greenhouse-wall-label" x="${w*10-14}" y="${h*7-14}">${escape(house.plot_code)} walls</text>${outside?`<text class="greenhouse-warning" x="16" y="${h*7-14}">${outside} bed${outside===1?' is':'s are'} outside the walls. ${isAdmin()?'Edit map and drag it inside.':''}</text>`:''}`;
+  return `<rect class="greenhouse-floor" x="0" y="0" width="${w*10}" height="${h*7}"/><rect x="0" y="0" width="${w*10}" height="${h*7}" fill="url(#house-ribs)" opacity=".7"/><rect class="greenhouse-wall" x="2" y="2" width="${w*10-4}" height="${h*7-4}"/><text class="greenhouse-wall-label" x="${w*10-14}" y="${h*7-14}">${escape(house.plot_code)} walls</text>${outside?`<text class="greenhouse-warning" x="16" y="${h*7-14}">${outside} bed${outside===1?' is':'s are'} outside the walls. ${isAdmin()?'Edit map and drag it inside.':''}</text>`:''}`;
 }
 function mapEditorToolbar() {
   return `<div class="map-edit-toolbar" aria-label="Map editing controls"><strong>${greenhouse()?'Edit greenhouse':'Edit map'}</strong><span>${greenhouse()?'Tap an empty spot inside the dashed walls to add a bed there. Tap a bed to move, resize or remove it. Beds always stay inside the walls.':'Drag a plot to move it. Drag a corner to resize.'}</span>${button(mapPlacing?'Cancel placement':greenhouse()?'Add bed':'Add plot',mapPlacing?'map-place-cancel':'new-plot','','secondary small','plus')}<p id="map-edit-status" role="status">${mapPlacing?`Tap where the new ${greenhouse()?'bed':'plot'} should go (or focus the map and press Enter).`:'Changes save as soon as you let go.'}</p><div id="map-edit-selection"></div></div>`;
@@ -267,7 +267,28 @@ function mapEditorToolbar() {
 function paintMapPlot(p,bounds=plotBounds(p)) {
   const [map_x,map_y,map_w,map_h]=bounds;
   const el=document.querySelector(`.map-plot[data-id="${p.plot_id}"]`);
-  if(el)el.outerHTML=mapPlotMarkup({...p,map_x,map_y,map_w,map_h});
+  if(el){el.outerHTML=mapPlotMarkup({...p,map_x,map_y,map_w,map_h});fitMapLabels(document.querySelector(`.map-plot[data-id="${p.plot_id}"]`));}
+}
+// Labels are measured after render because their size depends on the screen breakpoint:
+// each one drops its slot number, then falls back to the shorter name, then shrinks until it sits inside its plot on a readable plate.
+function fitMapLabels(scope=document) {
+  scope?.querySelectorAll?.('.map-plot-label').forEach(label=>{
+    const g=label.parentNode,shape=g.querySelector('.plot-shape'),plate=g.querySelector('.map-label-plate');
+    if(!shape||!plate||!label.getBBox)return;
+    label.style.fontSize='';
+    const w=shape.width.baseVal.value,h=shape.height.baseVal.value,thin=label.classList.contains('thin'),room=w-(thin?20:14);
+    let size=parseFloat(getComputedStyle(label).fontSize);
+    if(size>h*.72){size=h*.72;label.style.fontSize=size+'px';}
+    const tooWide=()=>label.getComputedTextLength()>room;
+    if(tooWide())label.querySelector('.map-plot-slot')?.remove();
+    if(tooWide()&&label.textContent!==label.dataset.slot&&label.dataset.code.length>label.dataset.slot.length)label.textContent=label.dataset.slot;
+    const len=label.getComputedTextLength();
+    if(len>room){size*=room/len;label.style.fontSize=size+'px';}
+    const box=label.getBBox(),pad=Math.max(3,size*.22);
+    plate.setAttribute('x',box.x-pad);plate.setAttribute('y',box.y-pad*.4);plate.setAttribute('width',box.width+pad*2);plate.setAttribute('height',box.height+pad*.8);
+    // Plants in a thin row start after the label, so none sit under it.
+    if(thin)g.querySelectorAll('.plot-plants use').forEach(u=>{if(u.transform.baseVal.consolidate()?.matrix.e<box.x+box.width+pad+12)u.remove();});
+  });
 }
 function selectMapEdit(id) {
   if(!editingMap||mapSaving||!isAdmin())return;
@@ -304,6 +325,7 @@ function placeMapPlot(point) {
 function mountGardenMap() {
   const svg=$('.map-svg');
   if(!svg)return;
+  fitMapLabels(svg);
   let drag, suppressClick=false;
   const point=(event,world=false)=>new DOMPoint(event.clientX,event.clientY).matrixTransform((world?$('.map-world'):svg).getScreenCTM().inverse());
   svg.addEventListener('pointerdown',event=>{
@@ -648,14 +670,15 @@ function updateBell() {
 // One place a new owner or staff member can read how the workspace fits together, starting with the page they are on.
 function help() {
   const admin=isAdmin(),pages={
-    dashboard:['Overview','Today at a glance: tasks due, missed work and plots that need water, fertilizer or harvest. Tap any item to jump to it.'],
-    tasks:['Maintenance tasks',`Open shows work still to do, Missed shows overdue work, Done shows the last 7 days of finished work (older work stays in Task reports). Tap a task to see details${admin?', reassign or delete it':', mark it complete, ask for cover or message an admin'}.`],
-    plots:['Garden plots',`Each rectangle is a space in the garden. Colour shows status (red missed, yellow due today, green growing, brown vacant); the label is the plot code used on tasks. Greenhouses show their beds inside; tap one to open it.${admin?' Edit map lets you drag plots to move them and drag corners to resize. Inside a greenhouse, the dashed line is its walls and new beds must fit inside it.':''}`],
-    inventory:['Crop information','The crop catalogue: varieties, notes and growing information used when planting.'],
-    reports:['Task reports','Weekly or monthly completion for each staff member, including missed, skipped and taken-over work.'],
-    staff:['Staff and access','Add accounts, change roles and turn access off for people who leave.']
-  },order=[view,...Object.keys(pages).filter(k=>k!==view)].filter(k=>pages[k]&&(admin||!['reports','staff'].includes(k)));
-  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">How to use BotaniQ</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="help-body"><p>${admin?'As an admin you lay out the garden, plant crops and schedule care tasks for staff.':'As staff you receive care tasks, complete them on the day, and ask for cover when you cannot.'} Use the menu on the left to move between pages and the search box to filter the page you are on.</p>${order.map((k,i)=>`<section><h3>${i===0?'This page: ':''}${pages[k][0]}</h3><p>${pages[k][1]}</p></section>`).join('')}</div>`;
+    dashboard:['Overview',['See what needs doing today.','Tap any item to open it.']],
+    tasks:['Maintenance tasks',['Open = to do. Missed = overdue. Done = last 7 days.',admin?'Tap a task to reassign or delete it.':'Tap a task to mark it done or ask for cover.']],
+    plots:['Garden plots',['Colour shows status: red missed, yellow due today, green growing, brown vacant.','Tap a plot to see its crop. Tap a greenhouse to see its beds.',...(admin?['Edit map: drag to move, drag a corner to resize.']:[])]],
+    inventory:['Crop information',['Look up crop varieties and growing notes.']],
+    reports:['Task reports',['See who finished, missed or covered tasks.']],
+    staff:['Staff and access',['Add people, change roles, turn off access.']]
+  },visible=Object.keys(pages).filter(k=>admin||!['reports','staff'].includes(k)),here=pages[view]?view:'dashboard',others=visible.filter(k=>k!==here);
+  const steps=list=>`<ul>${list.map(t=>`<li>${t}</li>`).join('')}</ul>`;
+  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">How to use BotaniQ</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="help-body"><section class="help-here"><span class="eyebrow">This page</span><h3>${pages[here][0]}</h3>${steps(pages[here][1])}</section><p class="help-nav">Use the menu to switch pages.</p><details class="help-more"><summary>Other pages</summary>${others.map(k=>`<section><h3>${pages[k][0]}</h3>${steps(pages[k][1])}</section>`).join('')}</details></div>`;
   if(!$('#modal').open)$('#modal').showModal();
 }
 function notifications() {

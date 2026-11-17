@@ -2289,15 +2289,17 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
   }
 }
 /* Map readability: greenhouses read as glass with their beds inside, labels keep a halo over textures. */
-.map-plot-label,.map-bed-caption {paint-order:stroke;stroke:#fffbe9;stroke-width:5px;stroke-linejoin:round}
+.map-bed-caption {paint-order:stroke;stroke:#fffbe9;stroke-width:5px;stroke-linejoin:round}
+.map-label-plate {fill:#fffbeecc;stroke:#14230f26;stroke-width:1;pointer-events:none}
 .map-plot-slot {font-weight:500;opacity:.7}
-.map-plot.house .plot-shape {fill:#e3efea}
-.map-plot.house .plot-texture {opacity:.45}
-.house-bed {fill:#cdb594;stroke:#7b6a4d;stroke-width:1.5;pointer-events:none}
+.map-plot.house .plot-shape {fill:#cfe3d8}
+.map-plot.house .plot-texture {opacity:.9}
+.house-bed {fill:#cdb594;stroke:#8d8f77;stroke-width:2;stroke-dasharray:6 2;pointer-events:none}
+.house-bed-rows {pointer-events:none}
 .house-bed.status-growing {fill:#a5cf80}
 .house-bed.status-care {fill:#f4c751}
 .house-bed.status-missed {fill:#e8806a}
-.greenhouse-floor {fill:#eef4ee}
+.greenhouse-floor {fill:#dcebe2}
 .greenhouse-wall {fill:none;stroke:#4f6f5a;stroke-width:5;stroke-dasharray:18 6;pointer-events:none}
 .greenhouse-wall-label {fill:#4f6f5a;font-size:16px;font-weight:650;text-anchor:end;pointer-events:none}
 .greenhouse-warning {fill:#a33725;font-size:17px;font-weight:650}
@@ -2309,7 +2311,12 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
 .help-body {padding:4px 24px 24px;display:grid;gap:14px}
 .help-body h3 {margin:0 0 4px;font-size:16px}
 .help-body p,.help-body li {margin:0;font-size:15px;line-height:1.5;color:#36472c}
-.help-body ul {margin:4px 0 0;padding-left:20px}
+.help-body ul {margin:4px 0 0;padding-left:20px;display:grid;gap:6px}
+.help-here {padding:16px 18px;background:#edf2e7;border-radius:6px}
+.help-here h3 {font-size:18px;margin-top:2px}
+.help-nav {font-size:14px}
+.help-more summary {cursor:pointer;font-weight:650;font-size:15px;padding:10px 0;min-height:44px;display:flex;align-items:center}
+.help-more section {padding:10px 0;border-top:1px solid var(--line)}
 
 /* Large monitors: scale the whole interface like its ~1440px design instead of shrinking text into empty space.
    Viewport units are scaled by zoom too, so every viewport unit divides by --zoom. */
