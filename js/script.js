@@ -238,7 +238,7 @@ function mapPlotMarkup(p) {
           const slot=p.map_slot||p.plot_id,[x,y,w,h]=plotBounds(p),c=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);
           const beds=activePlots().filter(b=>b.parent_plot_id===p.plot_id);
           const stage=c&&growthStage(c,state.today).label,caption=isGreenhouse(p)?`${beds.length} bed${beds.length===1?'':'s'}`:p.zone==='Open space'?'No planting':c?`${c.crop_name} · ${stage}`:'Vacant';
-          const status=plotStatus(p,state),thin=h<14,hasCode=w>=17,fitsCode=p.plot_code.length*11+16<=w*10,shape=isGreenhouse(p)?'house':p.zone==='Open space'?'space':'bed';
+          const status=plotStatus(p,state),thin=h<14,hasCode=w>=17,shape=isGreenhouse(p)?'house':p.zone==='Open space'?'space':'bed';
           const texture=isGreenhouse(p)?'house-ribs':p.zone==='Open space'?'paving':p.zone==='Nursery'?'nursery-trays':'bed-rows';
           const occupancy=isGreenhouse(p)?(beds.some(b=>b.occupancy_status==='Occupied')?'Occupied':'Vacant'):p.occupancy_status;
           const muted=!matchesPlot(p);
@@ -250,7 +250,7 @@ function mapPlotMarkup(p) {
             <rect class="plot-texture" x="${x*10+4}" y="${y*7+4}" width="${w*10-8}" height="${h*7-8}" rx="5" fill="url(#${texture})"/>
             ${plotPlants(c,[x,y,w,h],thin,hasCode)}
             ${houseBeds}
-            <rect class="map-label-plate" rx="5"/><text class="map-plot-label ${thin?'thin':''}" data-code="${escape(p.plot_code)}" data-slot="${slot}" x="${thin?x*10+12:(x+w/2)*10}" y="${(y+h/2)*7+(thin?7:5)}">${hasCode?`<tspan class="map-plot-slot">${slot} · </tspan>${escape(p.plot_code)}`:fitsCode?escape(p.plot_code):slot}</text>
+            <text class="map-plot-label ${thin?'thin':''}" x="${thin?x*10+12:(x+w/2)*10}" y="${(y+h/2)*7+(thin?7:5)}">${hasCode?`<tspan class="map-plot-slot">${slot} · </tspan>`:''}${escape(p.plot_code)}</text>
             ${h>=14?`<text class="map-bed-caption" x="${(x+w/2)*10}" y="${(y+h/2)*7+28}">${escape(w<16&&c?c.crop_name:caption)}</text>`:''}
             ${status==='care'||status==='missed'?`<g class="plot-task-alert"><rect x="${(x+w)*10-21}" y="${y*7-8}" width="26" height="26"/><text x="${(x+w)*10-8}" y="${y*7+10}">!</text></g>`:''}
             ${editingMap&&mapEditId===p.plot_id?['nw','ne','sw','se'].map(corner=>`<rect class="plot-handle ${corner}" data-corner="${corner}" x="${(x+(corner.includes('e')?w:0))*10-8}" y="${(y+(corner.includes('s')?h:0))*7-8}" width="16" height="16" rx="3" role="button" tabindex="0" aria-label="Resize ${corner} corner of ${escape(p.plot_code)} with arrow keys"/>`).join(''):''}
@@ -269,25 +269,20 @@ function paintMapPlot(p,bounds=plotBounds(p)) {
   const el=document.querySelector(`.map-plot[data-id="${p.plot_id}"]`);
   if(el){el.outerHTML=mapPlotMarkup({...p,map_x,map_y,map_w,map_h});fitMapLabels(document.querySelector(`.map-plot[data-id="${p.plot_id}"]`));}
 }
-// Labels are measured after render because their size depends on the screen breakpoint:
-// each one drops its slot number, then falls back to the shorter name, then shrinks until it sits inside its plot on a readable plate.
+// Labels share one size per screen; one that is too wide drops its slot number, and only shrinks if the name alone still overflows.
 function fitMapLabels(scope=document) {
   scope?.querySelectorAll?.('.map-plot-label').forEach(label=>{
-    const g=label.parentNode,shape=g.querySelector('.plot-shape'),plate=g.querySelector('.map-label-plate');
-    if(!shape||!plate||!label.getBBox)return;
+    const g=label.parentNode,shape=g.querySelector('.plot-shape');
+    if(!shape||!label.getComputedTextLength)return;
     label.style.fontSize='';
-    const w=shape.width.baseVal.value,h=shape.height.baseVal.value,thin=label.classList.contains('thin'),room=w-(thin?20:14);
+    const w=shape.width.baseVal.value,h=shape.height.baseVal.value,room=w-(label.classList.contains('thin')?20:12);
     let size=parseFloat(getComputedStyle(label).fontSize);
-    if(size>h*.72){size=h*.72;label.style.fontSize=size+'px';}
-    const tooWide=()=>label.getComputedTextLength()>room;
-    if(tooWide())label.querySelector('.map-plot-slot')?.remove();
-    if(tooWide()&&label.textContent!==label.dataset.slot&&label.dataset.code.length>label.dataset.slot.length)label.textContent=label.dataset.slot;
+    if(size>h*.75){size=h*.75;label.style.fontSize=size+'px';}
+    if(label.getComputedTextLength()>room)label.querySelector('.map-plot-slot')?.remove();
     const len=label.getComputedTextLength();
-    if(len>room){size*=room/len;label.style.fontSize=size+'px';}
-    const box=label.getBBox(),pad=Math.max(3,size*.22);
-    plate.setAttribute('x',box.x-pad);plate.setAttribute('y',box.y-pad*.4);plate.setAttribute('width',box.width+pad*2);plate.setAttribute('height',box.height+pad*.8);
+    if(len>room)label.style.fontSize=size*room/len+'px';
     // Plants in a thin row start after the label, so none sit under it.
-    if(thin)g.querySelectorAll('.plot-plants use').forEach(u=>{if(u.transform.baseVal.consolidate()?.matrix.e<box.x+box.width+pad+12)u.remove();});
+    if(label.classList.contains('thin')){const end=label.getBBox().x+label.getBBox().width+14;g.querySelectorAll('.plot-plants use').forEach(u=>{if(u.transform.baseVal.consolidate()?.matrix.e<end)u.remove();});}
   });
 }
 function selectMapEdit(id) {
