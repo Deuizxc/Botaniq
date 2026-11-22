@@ -383,6 +383,16 @@ test('crop catalog migration turns old demo crops into the garden crops and keep
   assert.equal(names.filter(p=>p.crop_name!=='Okra').length,7);
 });
 
+test('restore migration brings back a removed MAP-05 in place',async t=>{
+  const {db}=await fixture(t);
+  await db.query("UPDATE plots SET removed_at='2026-11-22T00:00:00Z' WHERE plot_code='MAP-05'; DELETE FROM schema_migrations WHERE name='013-restore-map-05'");
+  const before=(await db.query("SELECT map_x,map_y FROM plots WHERE plot_code='MAP-05'")).rows[0];
+  await seedDemo({...db},'2026-10-19');
+  const after=(await db.query("SELECT map_x,map_y,removed_at FROM plots WHERE plot_code='MAP-05'")).rows[0];
+  assert.equal(after.removed_at,null);
+  assert.deepEqual([after.map_x,after.map_y],[before.map_x,before.map_y]);
+});
+
 test('admin map layout persists, rejects stale edits, and removes plots without erasing history',async t=>{
   const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
   const edit={plot_id:1,revision:0,bounds:[10,20,15,10],map_edit:true};
