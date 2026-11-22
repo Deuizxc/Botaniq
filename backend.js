@@ -137,6 +137,16 @@ export function getPool() {
 }
 
 const seededPools = new WeakSet();
+// The garden catalog; migration 012 brings existing databases to the same list.
+const newCrops = [
+  ['Siling Labuyo', 'Capsicum frutescens', 'Full sun. Water when the topsoil is dry. Pick pods green or red about 3 months after transplanting.'],
+  ['French lavender', 'Lavandula dentata', 'Full sun, sandy well-drained soil. Water sparingly; wet roots rot. Trim spent flower spikes.'],
+  ['Italian oregano', 'Origanum x majoricum', 'Sun to light shade. Let the soil dry between waterings. Pinch tips to keep it bushy.'],
+  ['Peppermint', 'Mentha x piperita', 'Partial shade, moist soil. Spreads fast, so keep it contained. Cut stems often for fresh growth.'],
+  ['Garlic', 'Allium sativum', 'Plant cloves pointed end up, 2-3 cm deep. Water lightly. Harvest when half the leaves turn brown.'],
+  ['Mayana', 'Coleus scutellarioides', 'Bright shade for best leaf colour. Keep the soil evenly moist. Pinch flower buds to keep leaves full.'],
+  ['Ampalaya', 'Momordica charantia', 'Full sun. Grow on a trellis. Water often while fruiting. Harvest fruits young and green.']
+];
 async function migrateGardenMap(client) {
   await client.query('CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY)');
   const applied = await client.query("SELECT name FROM schema_migrations WHERE name='001-garden-map'");
@@ -144,7 +154,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin', '010-push', '011-remove-crop']) {
+  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin', '010-push', '011-remove-crop', '012-garden-crops']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
@@ -196,14 +206,7 @@ export async function seedDemo(dbPool, today = gardenDate()) {
       );
     }
 
-    for (const row of [
-      ['Bok choy', 'Pak choi', 'Leafy greens for the hydroponic greenhouse.'],
-      ['Chili', 'Siling haba', 'Harvest mature green fruits.'],
-      ['Cucumber', 'Slicing', 'Support with a trellis.'],
-      ['Radish', 'White radish', 'Root crop.'],
-      ['String beans', 'Sitaw', 'Climbing crop.'],
-      ['Tomato', 'Cherry', 'Nursery seedlings.']
-    ]) {
+    for (const row of newCrops) {
       await db.run('INSERT INTO plants(crop_name,variety,notes) VALUES(?,?,?)', ...row);
     }
 

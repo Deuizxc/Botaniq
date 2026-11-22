@@ -367,10 +367,21 @@ test('crop variety migration preserves existing plants and cycles',async t=>{
   await seedDemo({...db},'2026-10-19');
   assert.deepEqual((await db.query('SELECT * FROM plants ORDER BY plant_id')).rows,plants);
   assert.deepEqual((await db.query('SELECT * FROM crop_cycles ORDER BY cycle_id')).rows,cycles);
-  await db.query("INSERT INTO plants(crop_name,variety) VALUES('Tomato','Beefsteak')");
-  await assert.rejects(db.query("INSERT INTO plants(crop_name,variety) VALUES('tomato',' CHERRY ')") ,error=>error.code==='23505');
+  await db.query("INSERT INTO plants(crop_name,variety) VALUES('Garlic','Native')");
+  await assert.rejects(db.query("INSERT INTO plants(crop_name,variety) VALUES('garlic',' ALLIUM SATIVUM ')") ,error=>error.code==='23505');
 });
 
+
+test('crop catalog migration turns old demo crops into the garden crops and keeps planted ones',async t=>{
+  const {db}=await fixture(t);
+  await db.query("UPDATE crop_cycles SET plant_id=2; DELETE FROM plants WHERE plant_id>2; UPDATE plants SET crop_name='Bok choy',variety='Pak choi' WHERE plant_id=1; UPDATE plants SET crop_name='Okra',variety='' WHERE plant_id=2; INSERT INTO plants(crop_name,variety) VALUES('Kangkong',''); DELETE FROM schema_migrations WHERE name='012-garden-crops'");
+  await seedDemo({...db},'2026-10-19');
+  const names=(await db.query('SELECT plant_id,crop_name FROM plants ORDER BY plant_id')).rows;
+  assert.equal(names.find(p=>p.plant_id===1).crop_name,'Siling Labuyo');
+  assert.ok(names.some(p=>p.crop_name==='Okra'),'a crop with plantings stays');
+  assert.ok(!names.some(p=>p.crop_name==='Kangkong'),'an unplanted old crop leaves');
+  assert.equal(names.filter(p=>p.crop_name!=='Okra').length,7);
+});
 
 test('admin map layout persists, rejects stale edits, and removes plots without erasing history',async t=>{
   const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');

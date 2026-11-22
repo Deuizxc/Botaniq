@@ -2313,9 +2313,7 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
 .help-body ul {margin:4px 0 0;padding-left:20px;display:grid;gap:6px}
 .help-here {padding:16px 18px;background:#edf2e7;border-radius:6px}
 .help-here h3 {font-size:18px;margin-top:2px}
-.help-nav {font-size:14px}
-.help-more summary {cursor:pointer;font-weight:650;font-size:15px;padding:10px 0;min-height:44px;display:flex;align-items:center}
-.help-more section {padding:10px 0;border-top:1px solid var(--line)}
+.help-body section:not(.help-here) {padding:0 18px}
 
 /* Large monitors: scale the whole interface like its ~1440px design instead of shrinking text into empty space.
    Viewport units are scaled by zoom too, so every viewport unit divides by --zoom. */
@@ -2328,3 +2326,54 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
 .greenhouse-view .map-viewport {height:auto;max-height:calc(70vh / var(--zoom,1))}
 .greenhouse-view .map-svg {height:auto;max-height:calc(70vh / var(--zoom,1));cursor:default}
 .greenhouse-view.editing-map .map-svg {cursor:copy}
+/* Map look: a grassy site with gravel paths, wood-framed raised beds and glass greenhouses. Colour still means status. */
+.garden-map {background:#fff;border-color:#d9e2cd;box-shadow:0 1px 2px #263e2c0d,0 8px 24px #263e2c0f}
+.map-caption {padding:16px 22px;background:linear-gradient(#fff,#fafcf6)}
+.map-caption .eyebrow {font-weight:650;color:#2f4627}
+.map-viewport,.greenhouse-view .map-viewport {background:#d3e4bd}
+.map-ground {fill:#d3e4bd}
+.map-path-edge {stroke:#c3b48d;stroke-width:30;stroke-linecap:round}
+.map-path {stroke:#f2ead6;stroke-width:22;stroke-linecap:round}
+.map-entrance text {font-weight:650;fill:#2f4627}.map-entrance path {stroke:#2f4627;stroke-width:2.5}
+.plot-shape {fill:#c8a47a;stroke:#6f4f33;stroke-width:5;stroke-dasharray:none;rx:6px;filter:drop-shadow(0 4px 3px #2f3d2233)}
+.map-plot.status-growing .plot-shape,.house-bed.status-growing {fill:#9fd07a}
+.map-plot.status-care .plot-shape,.house-bed.status-care {fill:#f6c945}
+.map-plot.status-missed .plot-shape,.house-bed.status-missed {fill:#ee8467}
+.map-plot.nursery .plot-shape {stroke:#4f6b3a}
+.map-plot.house .plot-shape {fill:url(#glass);stroke:#4d7f6c;stroke-width:4}
+.map-plot.house .plot-texture {opacity:.8}
+.map-plot.space .plot-shape {stroke:#8b9085;stroke-width:3}
+.map-plot.space.status-open .plot-shape {fill:#e9e9e2}
+.map-plot:hover .plot-shape,.map-plot:focus-visible .plot-shape {stroke:#1f3a24;filter:drop-shadow(0 7px 6px #2f3d2240)}
+.map-plot[aria-pressed=true] .plot-shape {stroke:#1b3423;stroke-width:6}
+.house-bed {fill:#c8a47a;stroke:#6f4f33;stroke-width:2.5;stroke-dasharray:none;rx:3px}
+.greenhouse-floor {fill:url(#glass)}
+.greenhouse-wall {stroke:#4d7f6c}
+.map-plot-label,.map-bed-caption {fill:#162a12;stroke:#fffdf3;stroke-width:5px}
+.plot-task-alert rect {rx:13px;fill:#f6c945;stroke:#fff;stroke-width:2.5;filter:drop-shadow(0 2px 2px #2f3d2240)}
+.plot-task-alert text {fill:#3d2c00}
+.map-bottom {border-top:1px solid #e3e9db;align-items:flex-start}
+.map-key {display:grid;grid-template-columns:repeat(4,max-content);gap:8px 18px;align-items:center}
+.map-key strong {grid-column:1/-1;font-size:12px;color:#596653;margin-top:2px}
+.map-key span:before {width:14px;height:14px;border-radius:4px;margin-right:7px}
+.map-key .key-vacant:before {background:#c8a47a;box-shadow:inset 0 0 0 2px #6f4f33}
+.map-key .key-growing:before {background:#9fd07a}.map-key .key-care:before,.map-key .key-alert:before {background:#f6c945}.map-key .key-missed:before {background:#ee8467}
+.map-key .key-house:before {background:linear-gradient(135deg,#f2faf6,#b9dccf);box-shadow:inset 0 0 0 2px #4d7f6c;border:0}
+.map-key .key-alert:before {border-radius:50%}
+.greenhouse-bed {border-radius:8px;background:#f3f8ee;border-color:#c9d7bb;transition:border-color .2s,background .2s}
+.greenhouse-bed:hover {background:#e8f1df;border-color:#7f9b68}
+@media(max-width:900px) {.map-key {grid-template-columns:repeat(3,max-content)}}
+/* Phones: the map is as tall as the garden, so there are no empty bands, and the key packs into two columns. */
+@media(max-width:600px) {
+  .map-caption {padding:12px 14px;flex-wrap:wrap;gap:8px}.map-caption .eyebrow {font-size:14px}
+  .map-picker {flex:1;margin-left:0}.map-picker select {max-width:none;width:100%}
+  .map-viewport,.has-selection .map-viewport {height:auto}
+  .map-svg {height:auto;max-height:70vh}
+  .map-plot-label {font-size:34px;stroke-width:7px}
+  .plot-shape {stroke-width:6}
+  .map-bottom {padding:12px 14px;flex-direction:column;align-items:stretch}
+  .map-key {grid-template-columns:1fr 1fr;gap:8px 12px;width:100%}
+  .map-controls {width:100%;justify-content:stretch}.map-controls .btn {flex:1}
+  /* With a plot open, its details sit right under the map instead of below the key. */
+  .has-selection .map-key {display:none}
+}

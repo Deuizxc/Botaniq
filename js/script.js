@@ -196,9 +196,10 @@ function gardenMap(compact=false) {
     ${editingMap?mapEditorToolbar():''}
     <div class="map-caption"><span class="eyebrow">CUAI / Garden atlas</span><label class="map-picker"><span class="sr-only">Choose a plot</span><select id="map-picker"><option value="">Choose a plot…</option>${[...plots].sort((a,b)=>a.map_slot-b.map_slot).map(p=>`<option value="${p.plot_id}" ${selectedPlot()?.plot_id===p.plot_id?'selected':''}>${p.map_slot?`${p.map_slot} · `:''}${escape(p.plot_code)}</option>`).join('')}</select></label><span>${icon('sprout')} Tap a space. See what’s growing.</span></div>
     <div class="map-viewport"><svg class="map-svg" viewBox="0 0 ${width} ${height}" aria-label="${house?`Beds inside ${escape(house.plot_code)}`:'Garden plots. Drag or use arrow keys to move the map.'}" role="group" tabindex="0">
-      <defs><pattern id="map-grain" width="24" height="24" patternUnits="userSpaceOnUse"><rect x="2" y="2" width="2" height="2" fill="#a8b99b" opacity=".3"/></pattern>
-      <pattern id="bed-rows" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M0 7h14" stroke="#3b2a18" opacity=".16" stroke-width="2"/></pattern>
-      <pattern id="house-ribs" width="30" height="22" patternUnits="userSpaceOnUse"><path d="M15 0v22M0 11h30" stroke="#fff" opacity=".75" stroke-width="2"/></pattern>
+      <defs><pattern id="map-grain" width="46" height="46" patternUnits="userSpaceOnUse"><path d="M6 14l2-6 2 6M27 33l2-7 2 7M37 9l1-5 2 5M15 40l1-5 2 5" stroke="#6f9a52" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".45"/></pattern>
+      <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2faf6"/><stop offset=".55" stop-color="#d3ebe2"/><stop offset="1" stop-color="#b9dccf"/></linearGradient>
+      <pattern id="bed-rows" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M0 7h14" stroke="#3b2a18" opacity=".2" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="5 3"/></pattern>
+      <pattern id="house-ribs" width="34" height="34" patternUnits="userSpaceOnUse"><path d="M17 0v34M0 17h34" stroke="#fff" opacity=".9" stroke-width="2.5"/><path d="M4 12l8-8" stroke="#fff" opacity=".6" stroke-width="2" stroke-linecap="round"/></pattern>
       <pattern id="nursery-trays" width="18" height="18" patternUnits="userSpaceOnUse"><rect x="2" y="2" width="14" height="14" fill="none" stroke="#2f4a25" opacity=".24" stroke-width="1.5"/></pattern>
       <pattern id="paving" width="40" height="20" patternUnits="userSpaceOnUse"><path d="M0 .5h40M0 10.5h40M.5 0v10M20.5 10v10" stroke="#697162" opacity=".32" fill="none"/></pattern>
       <g id="map-seedling"><path fill="#2f6b2c" d="M-1 0C-2-8-1-14 0-20 1-14 2-8 1 0Z"/><path fill="#3f8a35" d="M0-16C-10-16-17-22-18-32-8-33 0-26 0-16ZM0-20C8-20 14-26 15-34 6-35 0-29 0-20Z"/></g>
@@ -662,7 +663,7 @@ function updateBell() {
   bell.setAttribute('aria-label',`Notifications, ${count} unread`);
   bell.innerHTML=icon('bell')+(count?`<span class="notification-count" aria-hidden="true">${count}</span>`:'');
 }
-// One place a new owner or staff member can read how the workspace fits together, starting with the page they are on.
+// Every page's guide at once, starting with the page they are on.
 function help() {
   const admin=isAdmin(),pages={
     dashboard:['Overview',['See what needs doing today.','Tap any item to open it.']],
@@ -671,9 +672,9 @@ function help() {
     inventory:['Crop information',['Look up crop varieties and growing notes.']],
     reports:['Task reports',['See who finished, missed or covered tasks.']],
     staff:['Staff and access',['Add people, change roles, turn off access.']]
-  },visible=Object.keys(pages).filter(k=>admin||!['reports','staff'].includes(k)),here=pages[view]?view:'dashboard',others=visible.filter(k=>k!==here);
+  },visible=Object.keys(pages).filter(k=>admin||!['reports','staff'].includes(k)),here=pages[view]?view:'dashboard',order=[here,...visible.filter(k=>k!==here)];
   const steps=list=>`<ul>${list.map(t=>`<li>${t}</li>`).join('')}</ul>`;
-  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">How to use BotaniQ</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="help-body"><section class="help-here"><span class="eyebrow">This page</span><h3>${pages[here][0]}</h3>${steps(pages[here][1])}</section><p class="help-nav">Use the menu to switch pages.</p><details class="help-more"><summary>Other pages</summary>${others.map(k=>`<section><h3>${pages[k][0]}</h3>${steps(pages[k][1])}</section>`).join('')}</details></div>`;
+  $('#modal').innerHTML=`<div class="modal-head"><h2 id="modal-title">How to use BotaniQ</h2><button class="icon-button" data-action="close" aria-label="Close">${icon('close')}</button></div><div class="help-body">${order.map(k=>`<section class="${k===here?'help-here':''}">${k===here?'<span class="eyebrow">This page</span>':''}<h3>${pages[k][0]}</h3>${steps(pages[k][1])}</section>`).join('')}</div>`;
   if(!$('#modal').open)$('#modal').showModal();
 }
 function notifications() {
