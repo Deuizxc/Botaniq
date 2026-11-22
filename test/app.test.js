@@ -405,6 +405,14 @@ test('restore migration brings back a removed MAP-05 in place',async t=>{
   assert.deepEqual([after.map_x,after.map_y],[before.map_x,before.map_y]);
 });
 
+test('MAP-05 is placed midway between wherever MAP-04 and MAP-06 are',async t=>{
+  const {db}=await fixture(t);
+  await db.query("UPDATE plots SET map_x=60,map_y=70,map_w=20,map_h=5 WHERE plot_code='MAP-04'; UPDATE plots SET map_x=10,map_y=10,map_w=8,map_h=8 WHERE plot_code='MAP-05'; DELETE FROM schema_migrations WHERE name='014-place-map-05'");
+  await seedDemo({...db},'2026-10-19');
+  const p=(await db.query("SELECT map_x,map_y,map_w,map_h FROM plots WHERE plot_code='MAP-05'")).rows[0];
+  assert.deepEqual([p.map_x,p.map_y,p.map_w,p.map_h],[60,(70+46.6)/2,20,5]);
+});
+
 test('admin map layout persists, rejects stale edits, and removes plots without erasing history',async t=>{
   const {db,request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
   const edit={plot_id:1,revision:0,bounds:[10,20,15,10],map_edit:true};

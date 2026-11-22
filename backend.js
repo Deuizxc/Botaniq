@@ -154,7 +154,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin', '010-push', '011-remove-crop', '012-garden-crops', '013-restore-map-05']) {
+  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin', '010-push', '011-remove-crop', '012-garden-crops', '013-restore-map-05', '014-place-map-05']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
