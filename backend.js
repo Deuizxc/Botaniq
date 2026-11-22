@@ -870,6 +870,8 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
 
       // shortcut: cleanup runs on authenticated requests; add a scheduled job if idle-time deletion is needed.
       await baseDb.run("UPDATE maintenance_tasks SET status='Missed' WHERE status='Pending' AND scheduled_date<=?",shiftDays(today(),-3));
+      // Missed work is kept for a week, then deleted with its notes and cover requests.
+      await baseDb.run("DELETE FROM maintenance_tasks WHERE status='Missed' AND scheduled_date<=?",shiftDays(today(),-7));
 
       if (path === '/api/logout' && req.method === 'POST') {
         await baseDb.run('DELETE FROM sessions WHERE token_hash=?', digest(token));

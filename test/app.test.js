@@ -297,6 +297,18 @@ test('harvest tasks close only their original live crop atomically',async t=>{
   assert.ok(await db.get('SELECT cycle_id FROM crop_cycles WHERE current_plot_id=3 AND harvest_date IS NULL'));
 });
 
+test('missed tasks 7 days overdue are deleted, newer missed and done tasks stay',async t=>{
+  const {db,request,login}=await fixture(t),admin=await login();
+  await db.query("UPDATE maintenance_tasks SET scheduled_date='2026-10-12' WHERE task_id=1");
+  await db.query("UPDATE maintenance_tasks SET scheduled_date='2026-10-13' WHERE task_id=2");
+  await db.query("UPDATE maintenance_tasks SET scheduled_date='2026-10-01',status='Completed',completed_at='2026-10-01T01:00:00Z' WHERE task_id=3");
+  await db.query("INSERT INTO task_messages(task_id,staff_id,message,created_at) VALUES(1,2,'Old task','2026-10-12T00:00:00Z')");
+  const ids=(await request('/api/state',undefined,admin)).body.tasks.map(t=>t.task_id);
+  assert.ok(!ids.includes(1),'7 days overdue is deleted');
+  assert.ok(ids.includes(2)&&ids.includes(3),'6 days overdue and completed work stay');
+  assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM task_messages WHERE task_id=1')).n,0);
+});
+
 test('three-day expiry marks pending work as missed and keeps it for reports',async t=>{
   const {db,request,login}=await fixture(t),admin=await login();
   await db.query("UPDATE maintenance_tasks SET scheduled_date='2026-10-16' WHERE task_id=1");
