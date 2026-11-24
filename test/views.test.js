@@ -194,4 +194,9 @@ test('crop edit, direct plot crop actions, backup/restore controls, and SDG alig
   assert.doesNotMatch(staffOverview,/Plant a crop/);
   assert.match(admin("state.messages=[{message_id:1,full_name:'Garden Staff',plot_code:'GH-01',task_type:'Manual watering',message:'Valve leaking',created_at:'2026-10-23T01:00:00.000Z',read_at:null}];dashboard()"),/Needs your review.*Valve leaking.*Mark read/s);
   assert.doesNotMatch(staff("state.messages=[{message_id:1,full_name:'Garden Staff',plot_code:'GH-01',task_type:'Manual watering',message:'Valve leaking',created_at:'2026-10-23T01:00:00.000Z',read_at:null}];dashboard()"),/Needs your review/);
+  assert.doesNotMatch(admin('shell.toString()'),/id="search"/);
+  for(const role of [admin,staff]) {
+    const houseCard=role("let h='';location.search='?id=30';state.plots=[{plot_id:30,plot_code:'GH-02',zone:'Greenhouse',map_slot:27},{plot_id:31,plot_code:'GH-02 / Bed 1',zone:'Greenhouse',parent_plot_id:30,occupancy_status:'Occupied'}];state.cycles=[{cycle_id:1,current_plot_id:31,crop_name:'Ginger'}];state.nutrients=[];document.querySelector=s=>s==='#plot-inspector'?{set hidden(v){},set innerHTML(v){h=v}}:null;renderPlotInspector();h");
+    assert.match(houseCard,/View interior/);assert.match(houseCard,/plot-info\.html\?greenhouse=30/);assert.match(houseCard,/Ginger/);
+  }
 });

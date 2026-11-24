@@ -115,9 +115,8 @@ function renderLogin() {
 }
 function shell() {
   const links=[['dashboard','grid'],['tasks','tasks'],['plots','sprout'],['inventory','leaf'],...(isAdmin()?[['reports','report'],['staff','users']]:[])];
-  $('#app').innerHTML=`<aside class="sidebar" id="sidebar"><button class="icon-button sidebar-close" data-action="menu" aria-label="Close navigation">${icon('close')}</button><a class="brand" href="${href('dashboard')}"><img class="brand-logo" src="/img/Logo.png" alt="BotaniQ"></a><div class="workspace">Garden workspace</div><nav class="nav" aria-label="Main navigation">${links.map(([name,ic])=>`<a href="${href(name)}" class="${view===name?'active':''}" ${view===name?'aria-current="page"':''} title="${pageNames[name]}">${icon(ic)}<span>${pageNames[name]}</span></a>`).join('')}</nav><div class="sidebar-bottom"><div class="garden-note">${icon('sprout')}<strong>Small steps. Lasting growth.</strong>Every record helps us care for a greener campus.</div><small>CUAI · QUEZON CITY UNIVERSITY</small></div></aside><div class="layout"><header class="topbar"><button class="icon-button mobile-menu" data-action="menu" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb">Workspace <span>/</span> <strong>${pageNames[view]}</strong></div><div class="top-spacer"></div><label class="search">${icon('search')}<input id="search" type="search" placeholder="Search" aria-label="Search current page" value="${escape(search)}"></label><button class="btn secondary small help-button" data-action="help" aria-haspopup="dialog">How to use</button><button class="icon-button" data-action="notifications" aria-label="Notifications">${icon('bell')}</button><div class="profile-wrap"><button class="profile" data-action="account" aria-label="Account settings" aria-expanded="false" aria-controls="profile-menu"><span class="avatar">${escape(initials(state.user.full_name))}</span><div><strong>${escape(state.user.full_name)}</strong><small>${isAdmin()?'Garden administrator':'Garden staff'}</small></div></button><div id="profile-menu" class="profile-menu" hidden><strong>${escape(state.user.full_name)}</strong><span>${escape(state.user.email)}</span>${button('Edit profile','edit-profile','','text','pencil')}${button('Sign out','logout','','text')}</div></div></header><main class="main" id="main"></main></div>`;
+  $('#app').innerHTML=`<aside class="sidebar" id="sidebar"><button class="icon-button sidebar-close" data-action="menu" aria-label="Close navigation">${icon('close')}</button><a class="brand" href="${href('dashboard')}"><img class="brand-logo" src="/img/Logo.png" alt="BotaniQ"></a><div class="workspace">Garden workspace</div><nav class="nav" aria-label="Main navigation">${links.map(([name,ic])=>`<a href="${href(name)}" class="${view===name?'active':''}" ${view===name?'aria-current="page"':''} title="${pageNames[name]}">${icon(ic)}<span>${pageNames[name]}</span></a>`).join('')}</nav><div class="sidebar-bottom"><div class="garden-note">${icon('sprout')}<strong>Small steps. Lasting growth.</strong>Every record helps us care for a greener campus.</div><small>CUAI · QUEZON CITY UNIVERSITY</small></div></aside><div class="layout"><header class="topbar"><button class="icon-button mobile-menu" data-action="menu" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb">Workspace <span>/</span> <strong>${pageNames[view]}</strong></div><div class="top-spacer"></div><button class="btn secondary small help-button" data-action="help" aria-haspopup="dialog">How to use</button><button class="icon-button" data-action="notifications" aria-label="Notifications">${icon('bell')}</button><div class="profile-wrap"><button class="profile" data-action="account" aria-label="Account settings" aria-expanded="false" aria-controls="profile-menu"><span class="avatar">${escape(initials(state.user.full_name))}</span><div><strong>${escape(state.user.full_name)}</strong><small>${isAdmin()?'Garden administrator':'Garden staff'}</small></div></button><div id="profile-menu" class="profile-menu" hidden><strong>${escape(state.user.full_name)}</strong><span>${escape(state.user.email)}</span>${button('Edit profile','edit-profile','','text','pencil')}${button('Sign out','logout','','text')}</div></div></header><main class="main" id="main"></main></div>`;
   updateBell();
-  $('#search').addEventListener('input',event=>{search=event.target.value;taskPage=1;renderMain();});
   renderMain();
 }
 function heading(title,description,action='') { return `<div class="page-heading"><div><h1>${title}</h1><p>${description}</p></div><div class="heading-actions">${action}</div></div>`; }
@@ -126,7 +125,7 @@ function link(label,name) { return `<a href="${href(name)}">${label} ${icon('arr
 function renderMain() {
   let content;
   if(view==='dashboard') content=dashboard();
-  if(view==='plots') {const p=selectedPlot();if(p&&isGreenhouse(p))history.replaceState({},'',`plot-info.html?greenhouse=${p.plot_id}`);content=plotsPage();}
+  if(view==='plots') content=plotsPage();
   if(view==='tasks') content=tasksPage();
   if(view==='reports') content=isAdmin()?reportsPage():empty('Task reports are available to administrators.');
   if(view==='inventory') content=inventoryPage();
@@ -409,8 +408,6 @@ function zoomMap(p) {
   $('#plot-inspector')?.classList.toggle('on-left',left);
 }
 function selectMapPlot(id) {
-  const p=state.plots.find(p=>p.plot_id===id);
-  if(p&&isGreenhouse(p)){zone='All zones';navigate(`plot-info.html?greenhouse=${id}`);return;}
   if(view!=='plots'){navigate(`plot-info.html?id=${id}`);return;}
   if(selectedPlot()?.plot_id===id){closeMapPlot();return;}
   mapPan={x:0,y:0};
@@ -441,15 +438,23 @@ function plotFacts(record,p) {
     <div><dt>${icon('sprout')} Last harvest</dt><dd>${escape(timestampLabel(record.harvested_at))}</dd></div>
     <div><dt>${icon('leaf')} Fertilizer</dt><dd>${escape(record.fertilizer||'None')}${record.fertilizer?`<small>${escape(timestampLabel(record.fertilized_at))}</small>`:''}</dd></div></dl>`;
 }
+function greenhouseSummary(p) {
+  const beds=activePlots().filter(b=>b.parent_plot_id===p.plot_id);
+  const occupied=beds.filter(b=>plotOccupancy(b)==='Occupied').length;
+  const rows=beds.map(b=>{const crop=liveCrop(state,b.plot_id);return `<a class="greenhouse-bed-row" href="plot-info.html?id=${b.plot_id}"><strong>${escape(b.plot_code)}</strong><span>${crop?escape(crop.crop_name):'Vacant'}</span></a>`;}).join('');
+  return `${plotPhoto(p)}<div class="plot-story"><h3>${beds.length} bed${beds.length===1?'':'s'} inside</h3><p>${occupied} occupied · ${beds.length-occupied} vacant. Open the interior to inspect or manage individual beds.</p></div><div class="greenhouse-cta"><a class="btn" href="plot-info.html?greenhouse=${p.plot_id}">View interior ${icon('arrow')}</a></div>${beds.length?`<div class="greenhouse-beds-list">${rows}</div>`:''}`;
+}
 function renderPlotInspector() {
   const panel=$('#plot-inspector'),p=selectedPlot();if(!panel||!p)return;
+  const isHouse=isGreenhouse(p);
   const c=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date),record=plotOverview(state,p,c);
   if(p.zone==='Open space'){record.crop_name='Open space';if(!state.entries.some(e=>e.plot_id===p.plot_id))record.description='Unplanted space for access, storage or other garden use.';}
+  const houseBeds=isHouse?activePlots().filter(b=>b.parent_plot_id===p.plot_id):[];
   panel.hidden=false;
-  panel.innerHTML=`<div class="inspector-heading"><div><span class="eyebrow">${p.removed_at?'Removed from map':escape(p.zone)} · Plot ${p.map_slot||p.plot_id}</span><h2 id="plot-heading" tabindex="-1">${escape(p.plot_code)}</h2>${p.zone==='Open space'||p.removed_at?'':`<div class="plot-status-row">${statusBadge(plotOccupancy(p))}${c?`${badge(plotStage(c).label,plotStage(c).label==='Seedling'?'amber':'')}<small>${plotStage(c).detail}</small>`:''}</div>`}</div><div class="inspector-buttons">${isAdmin()&&!p.removed_at&&plotTab==='overview'&&!editingPlot?`<button class="icon-button" data-action="plot-edit" aria-label="Edit plot details">${icon('pencil')}</button>`:''}<button class="btn plot-exit" data-action="map-reset" aria-label="Exit plot details">${icon('close')} Exit plot</button></div></div>
-    <div class="tabs inspector-tabs" role="tablist" aria-label="Plot information">${['overview','history'].map(tab=>`<button id="tab-${tab}" class="tab ${plotTab===tab?'active':''}" role="tab" aria-selected="${plotTab===tab}" aria-controls="plot-tab-content" tabindex="${plotTab===tab?0:-1}" data-action="plot-tab" data-id="${tab}">${tab==='overview'?'Overview':'History'}</button>`).join('')}</div>
+  panel.innerHTML=`<div class="inspector-heading"><div><span class="eyebrow">${p.removed_at?'Removed from map':escape(p.zone)} · Plot ${p.map_slot||p.plot_id}</span><h2 id="plot-heading" tabindex="-1">${escape(p.plot_code)}</h2>${p.zone==='Open space'||p.removed_at?'':isHouse?`<div class="plot-status-row">${badge(`${houseBeds.length} bed${houseBeds.length===1?'':'s'}`)}</div>`:`<div class="plot-status-row">${statusBadge(plotOccupancy(p))}${c?`${badge(plotStage(c).label,plotStage(c).label==='Seedling'?'amber':'')}<small>${plotStage(c).detail}</small>`:''}</div>`}</div><div class="inspector-buttons">${isAdmin()&&!p.removed_at&&plotTab==='overview'&&!editingPlot&&!isHouse?`<button class="icon-button" data-action="plot-edit" aria-label="Edit plot details">${icon('pencil')}</button>`:''}<button class="btn plot-exit" data-action="map-reset" aria-label="Exit plot details">${icon('close')} Exit plot</button></div></div>
+    ${isHouse?`<div id="plot-tab-content" class="inspector-content">${greenhouseSummary(p)}</div>`:`<div class="tabs inspector-tabs" role="tablist" aria-label="Plot information">${['overview','history'].map(tab=>`<button id="tab-${tab}" class="tab ${plotTab===tab?'active':''}" role="tab" aria-selected="${plotTab===tab}" aria-controls="plot-tab-content" tabindex="${plotTab===tab?0:-1}" data-action="plot-tab" data-id="${tab}">${tab==='overview'?'Overview':'History'}</button>`).join('')}</div>
     <div id="plot-tab-content" class="inspector-content" role="tabpanel" aria-labelledby="tab-${plotTab}">
-    ${plotTab==='history'?historyPanel(p):editingPlot&&isAdmin()&&!p.removed_at?plotEditor(record):`${plotFacts(record,p)}${isAdmin()&&!p.removed_at?plotCropActions(record):''}<div class="plot-state"><span>Times in Asia/Manila</span></div>`}</div>`;
+    ${plotTab==='history'?historyPanel(p):editingPlot&&isAdmin()&&!p.removed_at?plotEditor(record):`${plotFacts(record,p)}${isAdmin()&&!p.removed_at?plotCropActions(record):''}<div class="plot-state"><span>Times in Asia/Manila</span></div>`}</div>`}`;
   if(editingPlot)bindPlotEditor(p,record);
   if(plotTab==='history') {
     for(const id of ['history-query','history-fertilizer','history-from','history-to'])$('#'+id).addEventListener('input',()=>{

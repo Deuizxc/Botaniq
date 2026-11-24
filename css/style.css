@@ -2431,3 +2431,34 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
 @media(max-width:600px) {
   .crop-table .table-actions {justify-content:flex-start;flex-wrap:wrap}
 }
+
+.greenhouse-cta {
+  margin:14px 0 16px;
+}
+.greenhouse-cta .btn {
+  width:100%;
+  justify-content:center;
+}
+.greenhouse-beds-list {
+  display:grid;
+  gap:8px;
+}
+.greenhouse-bed-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:7px;
+  background:#fafbf7;
+  color:var(--dark);
+  text-decoration:none;
+  font-size:14px;
+}
+.greenhouse-bed-row:hover {
+  background:#eef3e6;
+}
+.greenhouse-bed-row span {
+  color:#596653;
+}
