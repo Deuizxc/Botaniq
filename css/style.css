@@ -2406,31 +2406,6 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
   font-size:13px;
   color:#596653;
 }
-.report-chart {
-  margin:14px 0 20px;
-  padding:14px 16px;
-  background:#fafbf7;
-  border:1px solid #e6ebdd;
-  border-radius:8px;
-}
-.report-chart svg {
-  width:100%;
-  height:auto;
-  display:block;
-}
-.chart-legend {
-  display:flex;
-  flex-wrap:wrap;
-  gap:14px;
-  margin-top:8px;
-  font-size:12px;
-  color:#596653;
-}
-.chart-legend span {
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-}
 .backup-panel {
   margin-top:24px;
 }

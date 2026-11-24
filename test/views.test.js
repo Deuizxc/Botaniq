@@ -169,21 +169,27 @@ test('reports list each staff member for admins and stay closed to staff',()=>{
   assert.doesNotMatch(page('Staff')('shell.toString().includes("isAdmin()?[[")?"":"reports"'),/reports/);
 });
 
-test('pagination controls appear on large task lists and report chart renders inline SVG',()=>{
+test('pagination controls appear on large task lists and staff get completion hints on non-today tasks',()=>{
   const render=page('Admin');
   render("state.tasks=Array.from({length:20},(_,i)=>({task_id:i+1,plot_id:1,plot_code:'OP-01',zone:'Outdoor',task_type:'Manual watering',assigned_staff_id:2,assigned_staff:'Garden Staff',status:'Pending',scheduled_date:'2026-10-23',scheduled_time:'08:00'}))");
   const p1=render('tasksPage()');
   assert.match(p1,/Page 1 of 2 \(20 records\)/);assert.equal((p1.match(/class="task-item"/g)||[]).length,15);
   const p2=render('taskPage=2;tasksPage()');
   assert.match(p2,/Page 2 of 2/);assert.equal((p2.match(/class="task-item"/g)||[]).length,5);
-  const report=render('reportsPage()');
-  assert.match(report,/class="report-chart"/);assert.match(report,/aria-label="Task outcome breakdown by staff member"/);
+  assert.doesNotMatch(render('reportsPage()'),/report-chart/);
+  const staff=page('Staff');
+  assert.match(staff('taskDetails(state.tasks[0])'),/Overdue tasks can no longer be completed/);
+  assert.match(staff("state.tasks[0].scheduled_date='2026-10-25';taskDetails(state.tasks[0])"),/you can mark it complete on that day/);
 });
 
-test('crop edit, backup/restore controls, and SDG alignment are rendered appropriately',()=>{
+test('crop edit, direct plot crop actions, backup/restore controls, and SDG alignment are rendered appropriately',()=>{
   const admin=page('Admin'),staff=page('Staff');
   assert.match(admin('inventoryPage()'),/data-action="edit-plant"/);
   assert.doesNotMatch(staff('inventoryPage()'),/data-action="edit-plant"/);
   assert.match(admin('staffPage()'),/href="\/api\/backup"/);assert.match(admin('staffPage()'),/data-action="restore-backup"/);
   assert.match(admin("let html='';document.querySelector=()=>({set innerHTML(v){html=v}});renderLanding();html"),/SDG 2.*SDG 11.*SDG 12/s);
+  const overview=admin("html='';location.search='?id=1';state.plots=[{plot_id:1,plot_code:'OP-01',zone:'Outdoor',occupancy_status:'Vacant'}];state.nutrients=[];document.querySelector=s=>s==='#plot-inspector'?{set hidden(v){},set innerHTML(v){html=v}}:null;renderPlotInspector();html");
+  assert.match(overview,/Plant a crop/);
+  const staffOverview=staff("let html='';location.search='?id=1';state.plots=[{plot_id:1,plot_code:'OP-01',zone:'Outdoor',occupancy_status:'Vacant'}];state.nutrients=[];document.querySelector=s=>s==='#plot-inspector'?{set hidden(v){},set innerHTML(v){html=v}}:null;renderPlotInspector();html");
+  assert.doesNotMatch(staffOverview,/Plant a crop/);
 });
