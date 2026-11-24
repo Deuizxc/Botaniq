@@ -192,4 +192,6 @@ test('crop edit, direct plot crop actions, backup/restore controls, and SDG alig
   assert.match(overview,/Plant a crop/);
   const staffOverview=staff("let html='';location.search='?id=1';state.plots=[{plot_id:1,plot_code:'OP-01',zone:'Outdoor',occupancy_status:'Vacant'}];state.nutrients=[];document.querySelector=s=>s==='#plot-inspector'?{set hidden(v){},set innerHTML(v){html=v}}:null;renderPlotInspector();html");
   assert.doesNotMatch(staffOverview,/Plant a crop/);
+  assert.match(admin("state.messages=[{message_id:1,full_name:'Garden Staff',plot_code:'GH-01',task_type:'Manual watering',message:'Valve leaking',created_at:'2026-10-23T01:00:00.000Z',read_at:null}];dashboard()"),/Needs your review.*Valve leaking.*Mark read/s);
+  assert.doesNotMatch(staff("state.messages=[{message_id:1,full_name:'Garden Staff',plot_code:'GH-01',task_type:'Manual watering',message:'Valve leaking',created_at:'2026-10-23T01:00:00.000Z',read_at:null}];dashboard()"),/Needs your review/);
 });

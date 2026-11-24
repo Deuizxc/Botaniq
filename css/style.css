@@ -2415,3 +2415,19 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
   gap:10px;
   padding:0 22px 22px;
 }
+
+.crop-table .table-actions {
+  align-items:center;
+  flex-wrap:nowrap;
+  gap:8px;
+  white-space:nowrap;
+}
+.admin-inbox {
+  margin-bottom:24px;
+}
+.inbox-list {
+  padding:0 22px 18px;
+}
+@media(max-width:600px) {
+  .crop-table .table-actions {justify-content:flex-start;flex-wrap:wrap}
+}
