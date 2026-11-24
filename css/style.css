@@ -2377,3 +2377,66 @@ button:focus-visible,a:focus-visible {outline:3px solid #284d36;outline-offset:3
   /* With a plot open, its details sit right under the map instead of below the key. */
   .has-selection .map-key {display:none}
 }
+
+.sdg-strip {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  list-style:none;
+  padding:0;
+  margin:14px 0 0;
+}
+.sdg-strip li {
+  font-size:13px;
+  color:#3e5135;
+  background:#eef3e6;
+  border:1px solid #d5e0c6;
+  border-radius:999px;
+  padding:5px 12px;
+}
+.sdg-strip strong {
+  color:#263b2c;
+}
+.pager {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:14px 4px 4px;
+  font-size:13px;
+  color:#596653;
+}
+.report-chart {
+  margin:14px 0 20px;
+  padding:14px 16px;
+  background:#fafbf7;
+  border:1px solid #e6ebdd;
+  border-radius:8px;
+}
+.report-chart svg {
+  width:100%;
+  height:auto;
+  display:block;
+}
+.chart-legend {
+  display:flex;
+  flex-wrap:wrap;
+  gap:14px;
+  margin-top:8px;
+  font-size:12px;
+  color:#596653;
+}
+.chart-legend span {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.backup-panel {
+  margin-top:24px;
+}
+.backup-actions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  padding:0 22px 22px;
+}

@@ -12,8 +12,19 @@ The system is deliberately lightweight: a vanilla HTML, CSS, and JavaScript fron
 * **Crop cycles**: Start, assign, transplant, and harvest crops. A nursery transplant is a single database transaction, and a partial unique index guarantees only one live crop per plot, even under concurrent requests.
 * **Task management**: Dated watering, fertilizer, hydroponic, harvest, and general maintenance tasks. Staff can take over a colleague's task with a required reason, which raises a review flag for admins. Watering tasks can be skipped or rescheduled for weather, with every change written to an audit log.
 * **Per-plot history**: Crop records, fertilizer applications, and snapshots of every admin save, searchable with tokens such as `crop:"String beans"`, `fertilizer:none`, and `before:2026-10-01`.
-* **Role-aware dashboards**: Staff see their unfinished tasks and a monthly calendar. Admins see daily staff progress and takeover reviews. Open sessions poll for updates every 30 seconds and announce new assignments with toasts. Admins also get a printable weekly and monthly task report per staff member. Tasks left overdue for three days are kept as Missed so the reports stay complete.
+* **Role-aware dashboards**: Staff see their unfinished tasks and a monthly calendar. Admins see daily staff progress and takeover reviews. Open sessions poll for updates every 30 seconds and announce new assignments with toasts. Admins also get a printable weekly and monthly task report per staff member with visual outcome breakdown charts. Tasks left overdue for three days are kept as Missed so the reports stay complete.
+* **Pagination, backup & restore**: Task lists and plot history are paginated (plus server-side `GET /api/tasks?page=&limit=` SQL pagination) backed by targeted PostgreSQL indexes. Administrators can download a point-in-time `REPEATABLE READ` JSON backup (`GET /api/backup`) and atomically restore it (`POST /api/restore`) inside a single database transaction.
 * **Manila-time scheduling**: The server always computes "today" in `Asia/Manila`, regardless of where it runs.
+
+---
+
+## SDG Alignment
+
+BotaniQ directly supports three United Nations Sustainable Development Goals at Quezon City University:
+
+* **SDG 2 — Zero Hunger (Sustainable Agriculture):** Tracks crop lifecycles from nursery seedlings through transplanting and harvest, helping campus staff maintain consistent urban food yields without losing plot history.
+* **SDG 11 — Sustainable Cities and Communities:** Turns ad hoc campus gardening into a coordinated, mapped, and accountable green-space operation across 27 outdoor, greenhouse, and nursery plots.
+* **SDG 12 — Responsible Consumption and Production:** Reduces water waste through weather-aware watering adjustments and midday heat warnings, and tracks every fertilizer and hydroponic nutrient application per plot.
 
 ---
 
@@ -37,7 +48,7 @@ The system is deliberately lightweight: a vanilla HTML, CSS, and JavaScript fron
 
 **Rules in two places.** Business rules such as transplant validity, takeover validation, and early-completion checks live in `backend.js`. The same constraints are duplicated in the database (check constraints, foreign keys, partial unique indexes) as a second line of defense.
 
-**Versioned migrations.** Files in `migrations/` (001 to 007) are applied once each on server start, or on the first API request on Vercel, and tracked in a `schema_migrations` table. Migrations preserve existing plot IDs and history, for example when each greenhouse becomes the container for its first bed.
+**Versioned migrations.** Files in `migrations/` (001 to 015) are applied once each on server start, or on the first API request on Vercel, and tracked in a `schema_migrations` table. Migrations preserve existing plot IDs and history, for example when each greenhouse becomes the container for its first bed, and maintain targeted indexes for fast queries.
 
 **Lazy task expiry.** Pending tasks are deleted once they are three calendar days overdue. Cleanup runs on the next authenticated request, so no background scheduler is needed.
 

@@ -26,7 +26,8 @@ const paths = {
 };
 const icon = name => `<svg aria-hidden="true" viewBox="0 0 24 24"><path d="${paths[name] || paths.leaf}"/></svg>`;
 let state, view, search = '', zone = 'All zones', taskFilter = 'Open', toastTimer;
-let staffFilter = 'all', cropSearch = '', calendarOffset = 0, calendarDate = '', mapZoom = 1;
+let staffFilter = 'all', cropSearch = '', calendarOffset = 0, calendarDate = '', mapZoom = 1, taskPage = 1, historyPage = 1;
+const PAGE_SIZE = 15;
 let mapPan = {x:0,y:0};
 let reportKind = 'Weekly', reportOffset = 0, reportStaff = 'all';
 const pageNames = {dashboard:'Overview',plots:'Garden plots',tasks:'Maintenance tasks',reports:'Task reports',inventory:'Crop information',staff:'Staff & access',nutrients:'Nutrient log'};
@@ -105,7 +106,7 @@ function gardenScene() {
 }
 function renderLanding() {
   document.title='BotaniQ · QCU garden care';
-  $('#app').innerHTML=`<div class="landing"><header class="landing-header"><a class="university" href="/"><img src="/img/qculogo.png" alt="Quezon City University seal" width="76" height="76"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><a class="btn" href="login.html">Get started ${icon('arrow')}</a></header><main><section class="landing-intro"><div><h1><img class="welcome-logo" src="/img/landing_welcomemsg.png" alt="Welcome to BotaniQ"></h1></div><div class="landing-copy"><p>A shared garden.<br>A little care, every day.</p><p>Keep QCU’s garden growing with clear tasks, planting schedules, and a record of every crop.</p></div></section><figure class="landing-scene">${gardenScene()}</figure></main><footer class="landing-footer"><a class="brand" href="/"><img src="/img/landing_botaniq.png" alt="BotaniQ"></a><p>Garden Tracker of Quezon City University</p></footer></div>`;
+  $('#app').innerHTML=`<div class="landing"><header class="landing-header"><a class="university" href="/"><img src="/img/qculogo.png" alt="Quezon City University seal" width="76" height="76"><span><strong>Quezon City University</strong><small>San Bartolome, Novaliches</small></span></a><a class="btn" href="login.html">Get started ${icon('arrow')}</a></header><main><section class="landing-intro"><div><h1><img class="welcome-logo" src="/img/landing_welcomemsg.png" alt="Welcome to BotaniQ"></h1></div><div class="landing-copy"><p>A shared garden.<br>A little care, every day.</p><p>Keep QCU’s garden growing with clear tasks, planting schedules, and a record of every crop.</p><ul class="sdg-strip" aria-label="UN Sustainable Development Goals alignment"><li><strong>SDG 2</strong> Zero Hunger</li><li><strong>SDG 11</strong> Sustainable Cities</li><li><strong>SDG 12</strong> Responsible Consumption</li></ul></div></section><figure class="landing-scene">${gardenScene()}</figure></main><footer class="landing-footer"><a class="brand" href="/"><img src="/img/landing_botaniq.png" alt="BotaniQ"></a><p>Garden Tracker of Quezon City University · Supporting UN SDGs 2, 11 &amp; 12</p></footer></div>`;
 }
 function renderLogin() {
   $('#modal').close();document.title='BotaniQ · Log in';
@@ -116,7 +117,7 @@ function shell() {
   const links=[['dashboard','grid'],['tasks','tasks'],['plots','sprout'],['inventory','leaf'],...(isAdmin()?[['reports','report'],['staff','users']]:[])];
   $('#app').innerHTML=`<aside class="sidebar" id="sidebar"><button class="icon-button sidebar-close" data-action="menu" aria-label="Close navigation">${icon('close')}</button><a class="brand" href="${href('dashboard')}"><img class="brand-logo" src="/img/Logo.png" alt="BotaniQ"></a><div class="workspace">Garden workspace</div><nav class="nav" aria-label="Main navigation">${links.map(([name,ic])=>`<a href="${href(name)}" class="${view===name?'active':''}" ${view===name?'aria-current="page"':''} title="${pageNames[name]}">${icon(ic)}<span>${pageNames[name]}</span></a>`).join('')}</nav><div class="sidebar-bottom"><div class="garden-note">${icon('sprout')}<strong>Small steps. Lasting growth.</strong>Every record helps us care for a greener campus.</div><small>CUAI · QUEZON CITY UNIVERSITY</small></div></aside><div class="layout"><header class="topbar"><button class="icon-button mobile-menu" data-action="menu" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumb">Workspace <span>/</span> <strong>${pageNames[view]}</strong></div><div class="top-spacer"></div><label class="search">${icon('search')}<input id="search" type="search" placeholder="Search" aria-label="Search current page" value="${escape(search)}"></label><button class="btn secondary small help-button" data-action="help" aria-haspopup="dialog">How to use</button><button class="icon-button" data-action="notifications" aria-label="Notifications">${icon('bell')}</button><div class="profile-wrap"><button class="profile" data-action="account" aria-label="Account settings" aria-expanded="false" aria-controls="profile-menu"><span class="avatar">${escape(initials(state.user.full_name))}</span><div><strong>${escape(state.user.full_name)}</strong><small>${isAdmin()?'Garden administrator':'Garden staff'}</small></div></button><div id="profile-menu" class="profile-menu" hidden><strong>${escape(state.user.full_name)}</strong><span>${escape(state.user.email)}</span>${button('Edit profile','edit-profile','','text','pencil')}${button('Sign out','logout','','text')}</div></div></header><main class="main" id="main"></main></div>`;
   updateBell();
-  $('#search').addEventListener('input',event=>{search=event.target.value;renderMain();});
+  $('#search').addEventListener('input',event=>{search=event.target.value;taskPage=1;renderMain();});
   renderMain();
 }
 function heading(title,description,action='') { return `<div class="page-heading"><div><h1>${title}</h1><p>${description}</p></div><div class="heading-actions">${action}</div></div>`; }
@@ -131,9 +132,9 @@ function renderMain() {
   if(view==='inventory') content=inventoryPage();
   if(view==='staff') content=isAdmin()?staffPage():empty('Staff management is available to administrators.');
   $('#main').classList.toggle('overview-page',view==='dashboard');
-  $('#main').innerHTML=content+`<footer class="footer"><span>${icon('leaf')}Growing with purpose. Caring for our campus.</span><span>BotaniQ · CUAI Garden Management &nbsp; / &nbsp; Demo garden</span></footer>`;
+  $('#main').innerHTML=content+`<footer class="footer"><span>${icon('leaf')}Growing with purpose. Caring for our campus (UN SDGs 2, 11 &amp; 12).</span><span>BotaniQ · CUAI Garden Management &nbsp; / &nbsp; Demo garden</span></footer>`;
   mountGardenMap();
-  $('#staff-filter')?.addEventListener('change',event=>{staffFilter=event.target.value;renderMain();});
+  $('#staff-filter')?.addEventListener('change',event=>{staffFilter=event.target.value;taskPage=1;renderMain();});
   $('#report-staff')?.addEventListener('change',event=>{reportStaff=event.target.value;renderMain();});
   $('#crop-search')?.addEventListener('input',event=>{
     cropSearch=event.target.value;
@@ -407,7 +408,7 @@ function selectMapPlot(id) {
   if(view!=='plots'){navigate(`plot-info.html?id=${id}`);return;}
   if(selectedPlot()?.plot_id===id){closeMapPlot();return;}
   mapPan={x:0,y:0};
-  editingPlot=false;plotTab='overview';historyQuery='';historyFertilizer='all';historyFrom='';historyTo='';
+  editingPlot=false;plotTab='overview';historyQuery='';historyFertilizer='all';historyFrom='';historyTo='';historyPage=1;
   history.pushState({},'',`plot-info.html?id=${id}`);
   zoomMap(selectedPlot());renderPlotInspector();syncMapEditButton();
   $('#plot-heading')?.focus({preventScroll:true});
@@ -446,7 +447,7 @@ function renderPlotInspector() {
   if(editingPlot)bindPlotEditor(p,record);
   if(plotTab==='history') {
     for(const id of ['history-query','history-fertilizer','history-from','history-to'])$('#'+id).addEventListener('input',()=>{
-      historyQuery=$('#history-query').value;historyFertilizer=$('#history-fertilizer').value;historyFrom=$('#history-from').value;historyTo=$('#history-to').value;renderHistoryResults();
+      historyQuery=$('#history-query').value;historyFertilizer=$('#history-fertilizer').value;historyFrom=$('#history-from').value;historyTo=$('#history-to').value;historyPage=1;renderHistoryResults();
     });
   }
 }
@@ -457,9 +458,15 @@ function historyPanel(p) {
     <details class="history-filter"><summary>Filter by date & fertilizer</summary><label>Fertilizer<select id="history-fertilizer"><option value="all">Any application</option><option value="used" ${historyFertilizer==='used'?'selected':''}>Fertilizer used</option><option value="none" ${historyFertilizer==='none'?'selected':''}>None</option></select></label><div class="history-dates"><label>From<input id="history-from" type="date" value="${historyFrom}"></label><label>To<input id="history-to" type="date" value="${historyTo}"></label></div></details></div>
     <div id="history-results">${historyResults(p)}</div>`;
 }
+function pager(page,pages,action,total) {
+  if(pages<=1)return '';
+  return `<nav class="pager" aria-label="Pagination"><button class="btn secondary small" data-action="${action}" data-id="${page-1}" ${page<=1?'disabled':''}>Previous</button><span>Page ${page} of ${pages} (${total} records)</span><button class="btn secondary small" data-action="${action}" data-id="${page+1}" ${page>=pages?'disabled':''}>Next</button></nav>`;
+}
 function historyResults(p) {
   const records=filterHistory(plotHistory(state,p),historyQuery,historyFertilizer,historyFrom,historyTo);
-  return `<p class="history-count" role="status">${records.length} ${records.length===1?'chapter':'chapters'} in this plot’s story</p>${records.map(r=>`<details class="history-entry"><summary><span class="history-dot"></span><span><strong>${fmt(r.date)}</strong><small>${escape(r.crop_name)} · ${r.type}</small></span><span class="history-expand">+</span></summary><div class="history-entry-body">${plotFacts(r)}</div></details>`).join('')||empty('No history matches. Try a different crop, date, or fertilizer filter.')}`;
+  const pages=Math.max(1,Math.ceil(records.length/PAGE_SIZE)),page=Math.min(historyPage,pages);
+  const visible=records.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
+  return `<p class="history-count" role="status">${records.length} ${records.length===1?'chapter':'chapters'} in this plot’s story</p>${visible.map(r=>`<details class="history-entry"><summary><span class="history-dot"></span><span><strong>${fmt(r.date)}</strong><small>${escape(r.crop_name)} · ${r.type}</small></span><span class="history-expand">+</span></summary><div class="history-entry-body">${plotFacts(r)}</div></details>`).join('')||empty('No history matches. Try a different crop, date, or fertilizer filter.')}${pager(page,pages,'history-page',records.length)}`;
 }
 function renderHistoryResults(){const p=selectedPlot();if(p)$('#history-results').innerHTML=historyResults(p);}
 function plotEditor(record) {
@@ -532,12 +539,24 @@ function taskDetails(t) {
 function tasksPage() {
   const scoped=state.tasks.filter(t=>isAdmin()?(staffFilter==='all'||String(t.assigned_staff_id)===staffFilter):t.assigned_staff_id===state.user.user_id);
   const tasks=scoped.filter(t=>match([t.task_type,t.plot_code,t.assigned_staff||'',t.substitute_staff||''])&&(taskFilter==='Done'?recentlyDone(t,state.today):taskFilter==='Missed'?isMissed(t,state.today):t.status==='Pending'));
+  const pages=Math.max(1,Math.ceil(tasks.length/PAGE_SIZE)),page=Math.min(taskPage,pages);
+  const visible=tasks.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
   const quietToday=!isAdmin()&&taskFilter==='Open'&&!search&&!scoped.some(t=>t.status==='Pending'&&t.scheduled_date<=state.today);
-  return heading('Maintenance tasks','Every care job with its date and who does it. Overdue work is shown first.',isAdmin()?button('Schedule task','new-task','','','plus'):'')+`<section class="task-board"><div class="task-toolbar">${filters(['Open','Missed','Done'],taskFilter,'task-filter')}${!isAdmin()?'My tasks':`<label class="task-scope">Show<select id="staff-filter"><option value="all">All team assignments</option>${options(state.users.filter(u=>u.role==='Staff'),'user_id','full_name',staffFilter)}</select></label>`}</div>${taskFilter==='Done'?'<p class="muted task-note">Done tasks clear from this list after 7 days. They stay in Task reports.</p>':taskFilter==='Missed'?'<p class="muted task-note">Missed tasks are deleted 7 days after their date, including from Task reports.</p>':''}${quietToday?empty('Nothing due today. Your garden is in good hands.'):''}${tasks.map(taskDetails).join('')||(!quietToday?empty('No '+taskFilter.toLowerCase()+' tasks match this view.'):'')}</section>${isAdmin()?'<button class="task-fab" data-action="new-task" aria-label="Schedule a task">'+icon('plus')+'</button>':''}`;
+  return heading('Maintenance tasks','Every care job with its date and who does it. Overdue work is shown first.',isAdmin()?button('Schedule task','new-task','','','plus'):'')+`<section class="task-board"><div class="task-toolbar">${filters(['Open','Missed','Done'],taskFilter,'task-filter')}${!isAdmin()?'My tasks':`<label class="task-scope">Show<select id="staff-filter"><option value="all">All team assignments</option>${options(state.users.filter(u=>u.role==='Staff'),'user_id','full_name',staffFilter)}</select></label>`}</div>${taskFilter==='Done'?'<p class="muted task-note">Done tasks clear from this list after 7 days. They stay in Task reports.</p>':taskFilter==='Missed'?'<p class="muted task-note">Missed tasks are deleted 7 days after their date, including from Task reports.</p>':''}${quietToday?empty('Nothing due today. Your garden is in good hands.'):''}${visible.map(taskDetails).join('')||(!quietToday?empty('No '+taskFilter.toLowerCase()+' tasks match this view.'):'')}${pager(page,pages,'task-page',tasks.length)}</section>${isAdmin()?'<button class="task-fab" data-action="new-task" aria-label="Schedule a task">'+icon('plus')+'</button>':''}`;
 }
 function reportNote(t) {
   if(t.covered_for)return `Taken over from ${t.covered_for}${t.takeover_reason?`: ${t.takeover_reason}`:''}`;
   return t.substitute_staff?`Covered by ${t.substitute_staff}`:'';
+}
+function reportChart(reports) {
+  const max=Math.max(1,...reports.map(r=>r.assigned)),barW=420,rowH=34,padL=140,h=reports.length*rowH+28;
+  const series=[['completed','#3f7245','Completed'],['ongoing','#6e93b0','Ongoing'],['missed','#c97a2b','Missed'],['skipped','#a7afa1','Skipped']];
+  const rows=reports.map((r,i)=>{
+    let x=padL;
+    const y=i*rowH+12,rects=series.map(([k,fill])=>{const w=r[k]/max*barW;const seg=w>0?`<rect x="${x.toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="18" rx="3" fill="${fill}"><title>${escape(r.full_name)}: ${r[k]} ${k}</title></rect>`:'';x+=w;return seg;}).join('');
+    return `<text x="${padL-10}" y="${y+13}" text-anchor="end" font-size="12" fill="#3e5135">${escape(r.full_name.split(' ').slice(0,2).join(' '))}</text>${rects}<text x="${(x+8).toFixed(1)}" y="${y+13}" font-size="12" fill="#596653">${r.assigned}</text>`;
+  }).join('');
+  return `<figure class="report-chart"><svg viewBox="0 0 ${padL+barW+44} ${h}" role="img" aria-label="Task outcome breakdown by staff member">${rows}</svg><figcaption class="chart-legend">${series.map(([,fill,label])=>`<span><svg width="10" height="10" aria-hidden="true"><rect width="10" height="10" rx="2" fill="${fill}"/></svg>${label}</span>`).join('')}</figcaption></figure>`;
 }
 function reportsPage() {
   const period=reportPeriod(state.today,reportKind,reportOffset),staff=state.users.filter(u=>u.role==='Staff'&&u.active);
@@ -551,14 +570,14 @@ function reportsPage() {
     <article class="report-paper" aria-label="${reportKind} task report">
       <header class="report-head"><img src="/img/qculogo.png" alt="" width="56" height="56"><div><p>Quezon City University · CUAI Garden</p><h2>${reportKind} task report</h2></div><dl><div><dt>Period</dt><dd>${period.label}</dd></div><div><dt>Generated</dt><dd>${fmt(state.today)}</dd></div></dl></header>
       <h3>Summary by staff</h3>
-      ${reports.length?`<div class="table-wrap"><table class="report-table"><thead><tr><th>Staff</th>${columns.map(([,label])=>`<th class="numeric">${label}</th>`).join('')}<th class="numeric">Completion</th></tr></thead><tbody>${reports.map(r=>`<tr><td>${escape(r.full_name)}</td>${columns.map(([key])=>`<td class="numeric">${r[key]}</td>`).join('')}<td class="numeric">${rate(r.rate)}</td></tr>`).join('')}</tbody>${reports.length>1?`<tfoot><tr><th>Total</th>${columns.map(([key])=>`<td class="numeric">${total(key)}</td>`).join('')}<td class="numeric">${rate(due?Math.round(total('completed')/due*100):null)}</td></tr></tfoot>`:''}</table></div>`:empty('No staff match this report.')}
+      ${reports.length?`${reportChart(reports)}<div class="table-wrap"><table class="report-table"><thead><tr><th>Staff</th>${columns.map(([,label])=>`<th class="numeric">${label}</th>`).join('')}<th class="numeric">Completion</th></tr></thead><tbody>${reports.map(r=>`<tr><td>${escape(r.full_name)}</td>${columns.map(([key])=>`<td class="numeric">${r[key]}</td>`).join('')}<td class="numeric">${rate(r.rate)}</td></tr>`).join('')}</tbody>${reports.length>1?`<tfoot><tr><th>Total</th>${columns.map(([key])=>`<td class="numeric">${total(key)}</td>`).join('')}<td class="numeric">${rate(due?Math.round(total('completed')/due*100):null)}</td></tr></tfoot>`:''}</table></div>`:empty('No staff match this report.')}
       <p class="report-note">Completion counts closed tasks only: completed, missed and skipped. Ongoing tasks are not held against anyone.</p>
       ${reports.map(r=>`<section class="report-staff"><h3>${escape(r.full_name)}</h3>${r.rows.length?`<div class="table-wrap"><table class="report-table"><thead><tr><th>Date</th><th>Time</th><th>Task</th><th>Plot</th><th>Status</th><th>Notes</th></tr></thead><tbody>${r.rows.map(t=>`<tr><td>${fmt(t.scheduled_date)}</td><td>${clock(t.scheduled_time)}</td><td>${escape(t.task_type)}</td><td>${escape(t.plot_code)}</td><td>${reportStatus(t,state.today)}</td><td>${escape(reportNote(t))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="report-none">No tasks assigned in this period.</p>'}</section>`).join('')}
       <footer class="report-sign"><div><span>${escape(state.user.full_name)}</span><small>Prepared by</small></div><div><span></span><small>Noted by</small></div></footer>
     </article>`;
 }
-function inventoryPage() { const plants=state.plants.filter(p=>match([p.crop_name,p.variety,p.notes])&&`${p.crop_name} ${p.variety||''} ${p.notes||''}`.toLowerCase().includes(cropSearch.trim().toLowerCase()));return heading('Crop Information','The crops and varieties you can plant, with growing notes.',isAdmin()?button('Add crop','new-plant','','','plus'):'')+`<div class="catalog-filter"><label for="crop-search">Find a crop or variety</label><input id="crop-search" type="search" value="${escape(cropSearch)}" placeholder="Search crops, varieties or notes" autocomplete="off"></div><section class="panel" id="crop-results" aria-live="polite">${panelHead('Crop information',`${state.plants.length} crop varieties in the garden catalog`)}${plants.length?`<div class="table-wrap"><table class="crop-table"><thead><tr><th>Crop</th><th>Variety</th><th class="numeric">Live cycles</th><th>Growing notes</th><th></th></tr></thead><tbody>${plants.map(p=>`<tr><td><strong>${escape(p.crop_name)}</strong></td><td data-label="Variety">${escape(p.variety||'—')}</td><td data-label="Live cycles" class="numeric">${state.cycles.filter(c=>c.plant_id===p.plant_id&&!c.harvest_date).length}</td><td data-label="Growing notes">${escape(p.notes||'—')}</td><td>${isAdmin()?button('Plant crop','plant-crop',p.plant_id,'secondary small')+button('Delete','remove-plant',p.plant_id,'text danger'):''}</td></tr>`).join('')}</tbody></table></div>`:empty('No crops match your search.')}</section>`; }
-function staffPage() { return heading('Staff and Access','Add people, choose their role, and remove access when someone leaves.',button('Add account','new-user','','','plus'))+`<div class="account-grid">${state.users.filter(u=>match([u.full_name,u.email,u.role])).map(u=>`<article class="person-card"><span class="avatar">${escape(initials(u.full_name))}</span><h3>${escape(u.full_name)}</h3><p>${escape(u.email)}<br>${u.role} · ${state.tasks.filter(t=>t.assigned_staff_id===u.user_id&&t.status==='Pending').length} pending tasks</p><div class="person-bottom">${badge(u.active?'Active':'Inactive',u.active?'':'gray')}${u.user_id!==state.user.user_id?button('Remove account','remove-user',u.user_id,'text danger'):'<small class="muted">Your account</small>'}</div></article>`).join('')}</div>`; }
+function inventoryPage() { const plants=state.plants.filter(p=>match([p.crop_name,p.variety,p.notes])&&`${p.crop_name} ${p.variety||''} ${p.notes||''}`.toLowerCase().includes(cropSearch.trim().toLowerCase()));return heading('Crop Information','The crops and varieties you can plant, with growing notes.',isAdmin()?button('Add crop','new-plant','','','plus'):'')+`<div class="catalog-filter"><label for="crop-search">Find a crop or variety</label><input id="crop-search" type="search" value="${escape(cropSearch)}" placeholder="Search crops, varieties or notes" autocomplete="off"></div><section class="panel" id="crop-results" aria-live="polite">${panelHead('Crop information',`${state.plants.length} crop varieties in the garden catalog`)}${plants.length?`<div class="table-wrap"><table class="crop-table"><thead><tr><th>Crop</th><th>Variety</th><th class="numeric">Live cycles</th><th>Growing notes</th><th></th></tr></thead><tbody>${plants.map(p=>`<tr><td><strong>${escape(p.crop_name)}</strong></td><td data-label="Variety">${escape(p.variety||'—')}</td><td data-label="Live cycles" class="numeric">${state.cycles.filter(c=>c.plant_id===p.plant_id&&!c.harvest_date).length}</td><td data-label="Growing notes">${escape(p.notes||'—')}</td><td>${isAdmin()?button('Plant crop','plant-crop',p.plant_id,'secondary small')+button('Edit','edit-plant',p.plant_id,'text')+button('Delete','remove-plant',p.plant_id,'text danger'):''}</td></tr>`).join('')}</tbody></table></div>`:empty('No crops match your search.')}</section>`; }
+function staffPage() { return heading('Staff and Access','Add people, choose their role, and remove access when someone leaves.',button('Add account','new-user','','','plus'))+`<div class="account-grid">${state.users.filter(u=>match([u.full_name,u.email,u.role])).map(u=>`<article class="person-card"><span class="avatar">${escape(initials(u.full_name))}</span><h3>${escape(u.full_name)}</h3><p>${escape(u.email)}<br>${u.role} · ${state.tasks.filter(t=>t.assigned_staff_id===u.user_id&&t.status==='Pending').length} pending tasks</p><div class="person-bottom">${badge(u.active?'Active':'Inactive',u.active?'':'gray')}${u.user_id!==state.user.user_id?button('Remove account','remove-user',u.user_id,'text danger'):'<small class="muted">Your account</small>'}</div></article>`).join('')}</div><section class="panel backup-panel">${panelHead('Database backup & restore','Download a consistent JSON snapshot of all garden records or restore from a previous backup.')}<div class="backup-actions"><a class="btn secondary" href="/api/backup" download>Download backup</a>${button('Restore from backup','restore-backup','','secondary')}</div></section>`; }
 function confirmWarning(warnings) {
   const dialog=$('#confirm');
   dialog.innerHTML=`${warnings.map(w=>`<h2>${escape(w.title)}</h2><p>${escape(w.text)}</p>`).join('')}<p class="confirm-question">Do you still want to continue?</p><div class="modal-actions"><button type="button" class="btn secondary" value="cancel">Cancel</button><button type="button" class="btn" value="continue">Continue</button></div>`;
@@ -583,6 +602,7 @@ function openForm(action,id) {
   const invite=(state.invites||[]).find(i=>i.invite_id===Number(id));
   const today=state.today,task=state.tasks.find(t=>t.task_id===Number(id)),cycle=state.cycles.find(c=>c.cycle_id===Number(id));
   if(action==='new-plant') modal('Add a crop','Keep the shared crop catalog up to date.',`${field('Crop name','crop_name','text','','required maxlength="80"')}${field('Variety','variety','text','','maxlength="80"')}${field('Growing notes (optional)','notes','text','','maxlength="500"')}`,'plants');
+  if(action==='edit-plant') {const p=state.plants.find(p=>p.plant_id===Number(id));if(p)modal('Edit crop','Update crop details in the shared catalog.',`${field('Crop name','crop_name','text',p.crop_name,'required maxlength="80"')}${field('Variety','variety','text',p.variety||'','maxlength="80"')}${field('Growing notes (optional)','notes','text',p.notes||'','maxlength="500"')}`,'update-plant',{plant_id:p.plant_id},'Save crop');}
   if(action==='new-plot'&&editingMap&&isAdmin()) {mapPlacing=true;renderMain();$('.map-svg')?.focus({preventScroll:true});}
   if(action==='remove-plot'&&editingMap&&isAdmin()) {
     const p=activePlots().find(p=>p.plot_id===Number(id));if(!p)return;
@@ -631,6 +651,21 @@ function openForm(action,id) {
   if(action==='new-user') modal('Add an authorized account','Use at least 8 characters. Share the initial password securely and ask the staff member to update it in Edit profile.',`${field('Full name','full_name','text','','required maxlength="100"')}${field('Email address','email','email','','required maxlength="150" autocomplete="off"')}${select('Role','role',options(['Staff','Admin'].map(x=>({x})),'x','x'))}${field('Initial password','password','password','','required minlength="8" maxlength="128" autocomplete="new-password"')}`,'users',{},'Create account');
   if(action==='remove-user') {const user=state.users.find(u=>u.user_id===Number(id));modal('Remove account?',`Remove ${escape(user.full_name)}? Access ends immediately. Garden history keeps their name; pending tasks and live crops become unassigned. This cannot be undone.`,'','remove-user',{user_id:user.user_id},'Remove account');}
   if(action==='edit-profile') modal('Edit profile','Update your details. Enter your current password to change your email or password. Security changes sign you out of every session.',`${field('Full name','full_name','text',state.user.full_name,'required maxlength="100" autocomplete="name"')}${field('Email address','email','email',state.user.email,'required maxlength="150" autocomplete="email"')}${field('Current password','current_password','password','','maxlength="128" autocomplete="current-password"')}${field('New password (optional, 8 characters minimum)','password','password','','minlength="8" maxlength="128" autocomplete="new-password"')}`,'profile',{},'Save profile');
+  if(action==='restore-backup') {
+    const dialog=$('#modal');
+    dialog.innerHTML=`<div class="modal-head"><h2 id="modal-title">Restore from backup</h2><button class="icon-button" data-action="close" aria-label="Close dialog">${icon('close')}</button></div><div class="modal-body"><p>Upload a BotaniQ JSON backup file. This replaces all current garden records atomically and signs out active sessions.</p><form id="restore-form"><div class="field"><label for="f-backup-file">Backup JSON file</label><input id="f-backup-file" type="file" accept="application/json,.json" required></div><div class="form-error" role="alert"></div><div class="modal-actions"><button type="button" class="btn secondary" data-action="close">Cancel</button><button class="btn danger" type="submit">Restore database</button></div></form></div>`;
+    if(!dialog.open)dialog.showModal();
+    $('#restore-form').addEventListener('submit',async event=>{
+      event.preventDefault();const form=event.currentTarget,submit=form.querySelector('[type="submit"]'),file=$('#f-backup-file').files[0];if(!file)return;
+      submit.disabled=true;
+      try {
+        const data=JSON.parse(await file.text());
+        if(!await confirmWarning([{title:'Replace all current garden data?',text:'Restoring this backup overwrites every table in a single transaction and signs everyone out.'}]))return;
+        await api('restore',data);dialog.close();state=null;renderLogin();toast('Database restored. Sign in to continue.');
+      } catch(error){form.querySelector('.form-error').textContent=error.message||'Invalid backup file.';}
+      finally{submit.disabled=false;}
+    });
+  }
 }
 const pushOn=()=>Boolean(state.push_key)&&'serviceWorker' in navigator&&'PushManager' in window&&!isAdmin();
 async function syncPush(ask) {
@@ -697,7 +732,7 @@ document.addEventListener('click',async event=>{
   const anchor=event.target.closest('a');
   if(anchor?.dataset.taskDate){taskFilter=anchor.dataset.taskDate<state.today?'Missed':'Open';staffFilter='all';}
   if(anchor?.dataset.summary){taskFilter=anchor.dataset.summary;staffFilter='all';}
-  if(anchor&&state&&!['/','/index.html','/login.html'].includes(anchor.pathname)&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&anchor.origin===location.origin) {event.preventDefault();$('#modal')?.close();navigate(anchor.getAttribute('href'));return;}
+  if(anchor&&state&&!anchor.hasAttribute('download')&&!anchor.pathname.startsWith('/api/')&&!['/','/index.html','/login.html'].includes(anchor.pathname)&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&anchor.origin===location.origin) {event.preventDefault();$('#modal')?.close();navigate(anchor.getAttribute('href'));return;}
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id}=target.dataset;
   try {
@@ -719,7 +754,9 @@ document.addEventListener('click',async event=>{
     if(action==='plot-cancel'){editingPlot=false;renderPlotInspector();return;}
     if(action==='history-token'){const input=$('#history-query');input.value+=(input.value?' ':'')+id+':';historyQuery=input.value;input.focus();renderHistoryResults();return;}
     if(action==='zone'){zone=id;filterMap();return;}
-    if(action==='task-filter'){taskFilter=id;renderMain();return;}
+    if(action==='task-filter'){taskFilter=id;taskPage=1;renderMain();return;}
+    if(action==='task-page'){taskPage=Math.max(1,Number(id));renderMain();return;}
+    if(action==='history-page'){historyPage=Math.max(1,Number(id));renderHistoryResults();return;}
     if(action==='report-kind'){reportKind=id;reportOffset=0;renderMain();return;}
     if(action==='report-step'){reportOffset=Math.min(0,reportOffset+Number(id));renderMain();return;}
     if(action==='report-print'){window.print();return;}

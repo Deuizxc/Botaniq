@@ -499,3 +499,39 @@ test('push subscriptions belong to the user who enabled them and can be removed'
   assert.equal((await request('/api/push-unsubscribe',{endpoint:sub.endpoint},staff)).status,200);
   assert.equal((await db.get('SELECT COUNT(*)::int AS n FROM push_subscriptions')).n,0);
 });
+
+test('admin can update crop catalog records while enforcing uniqueness and RBAC',async t=>{
+  const {request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
+  assert.equal((await request('/api/update-plant',{plant_id:1,crop_name:'Siling Labuyo',variety:'Wild',notes:'Updated notes'},staff)).status,403);
+  assert.equal((await request('/api/update-plant',{plant_id:999,crop_name:'Ghost',variety:'',notes:''},admin)).status,404);
+  assert.equal((await request('/api/update-plant',{plant_id:1,crop_name:'Garlic',variety:'Allium sativum',notes:'Duplicate'},admin)).status,409);
+  assert.equal((await request('/api/update-plant',{plant_id:1,crop_name:'Siling Labuyo',variety:'Native hot',notes:'Water lightly.'},admin)).status,200);
+  const updated=(await request('/api/state',undefined,admin)).body.plants.find(p=>p.plant_id===1);
+  assert.equal(updated.variety,'Native hot');assert.equal(updated.notes,'Water lightly.');
+});
+
+test('paginated tasks endpoint respects role boundaries, filters, and LIMIT/OFFSET',async t=>{
+  const {request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
+  const p1=await request('/api/tasks?page=1&limit=2&status=Open',undefined,admin);
+  const p2=await request('/api/tasks?page=2&limit=2&status=Open',undefined,admin);
+  assert.equal(p1.status,200);assert.equal(p1.body.items.length,2);assert.equal(p1.body.total,5);assert.equal(p1.body.pages,3);
+  assert.equal(p2.body.items.length,2);assert.notEqual(p1.body.items[0].task_id,p2.body.items[0].task_id);
+  const staffPage=await request('/api/tasks?page=1&limit=10&status=Open',undefined,staff);
+  assert.ok(staffPage.body.items.every(item=>item.assigned_staff_id===2));
+});
+
+test('admin backup exports a consistent snapshot and restore replaces data atomically',async t=>{
+  const {request,login}=await fixture(t),admin=await login(),staff=await login('heavenashley@gmail.com');
+  assert.equal((await request('/api/backup',undefined,staff)).status,403);
+  const snap=await request('/api/backup',undefined,admin);
+  assert.equal(snap.status,200);assert.equal(snap.body.version,1);assert.ok(snap.body.tables.plants.length>=7);
+  assert.equal((await request('/api/plants',{crop_name:'Temporary Crop',variety:'Test',notes:''},admin)).status,200);
+  assert.equal((await request('/api/restore',snap.body,staff)).status,403);
+  assert.equal((await request('/api/restore',{version:1,tables:{...snap.body.tables,users:[]}},admin)).status,400);
+  const restored=await request('/api/restore',snap.body,admin);
+  assert.equal(restored.status,200);assert.equal(restored.body.signed_out,true);
+  assert.equal((await request('/api/state',undefined,admin)).status,401);
+  const freshAdmin=await login();
+  assert.ok(!(await request('/api/state',undefined,freshAdmin)).body.plants.some(p=>p.crop_name==='Temporary Crop'));
+  assert.equal((await request('/api/plants',{crop_name:'Post Restore Crop',variety:'',notes:''},freshAdmin)).status,200);
+});

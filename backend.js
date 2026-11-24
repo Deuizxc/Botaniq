@@ -97,6 +97,19 @@ const taskTypes = [
   'Harvest'
 ];
 
+const BACKUP_TABLES = [
+  ['users', 'user_id', ['user_id', 'full_name', 'email', 'password_hash', 'role', 'active', 'removed_at']],
+  ['plants', 'plant_id', ['plant_id', 'crop_name', 'variety', 'notes']],
+  ['plots', 'plot_id', ['plot_id', 'plot_code', 'zone', 'occupancy_status', 'map_slot', 'map_x', 'map_y', 'map_w', 'map_h', 'map_revision', 'removed_at', 'photo_data', 'photo_version', 'parent_plot_id']],
+  ['crop_cycles', 'cycle_id', ['cycle_id', 'plant_id', 'origin_plot_id', 'current_plot_id', 'assigned_staff_id', 'planted_date', 'transplanted_date', 'harvest_date', 'cycle_status', 'planting_stage']],
+  ['maintenance_tasks', 'task_id', ['task_id', 'plot_id', 'task_type', 'scheduled_date', 'scheduled_time', 'assigned_staff_id', 'substitute_staff_id', 'takeover_reason', 'status', 'is_flagged_for_admin', 'completed_at', 'reviewed_at', 'reviewed_by', 'cycle_id', 'covered_for_id']],
+  ['task_adjustments', 'adjustment_id', ['adjustment_id', 'task_id', 'staff_id', 'reason', 'action', 'previous_schedule', 'new_schedule', 'created_at']],
+  ['nutrient_logs', 'log_id', ['log_id', 'plot_id', 'staff_id', 'application_date', 'nutrient_type', 'product', 'notes', 'task_id', 'applied_at']],
+  ['plot_entries', 'entry_id', ['entry_id', 'plot_id', 'cycle_id', 'description', 'watered_at', 'harvested_at', 'fertilizer', 'fertilized_at', 'recorded_at', 'recorded_by']],
+  ['task_messages', 'message_id', ['message_id', 'task_id', 'staff_id', 'message', 'created_at', 'read_at']],
+  ['coverage_invites', 'invite_id', ['invite_id', 'task_id', 'staff_id', 'is_read']]
+];
+
 // Convert "?" placeholders into PostgreSQL "$1, $2, ..."
 function toPgSql(sql) {
   let index = 0;
@@ -154,7 +167,7 @@ async function migrateGardenMap(client) {
     await client.query(readFileSync(join(ROOT, 'migrations/001-garden-map.sql'), 'utf8'));
     await client.query("INSERT INTO schema_migrations(name) VALUES('001-garden-map')");
   }
-  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin', '010-push', '011-remove-crop', '012-garden-crops', '013-restore-map-05', '014-place-map-05']) {
+  for (const name of ['002-accounts', '003-task-care', '004-crop-varieties', '005-map-editor', '006-plot-photos', '007-greenhouse-care', '008-task-coverage', '009-reports-and-demo-admin', '010-push', '011-remove-crop', '012-garden-crops', '013-restore-map-05', '014-place-map-05', '015-indexes']) {
     const done = await client.query('SELECT name FROM schema_migrations WHERE name=$1', [name]);
     if (!done.rows.length) {
       await client.query(readFileSync(join(ROOT, `migrations/${name}.sql`), 'utf8'));
@@ -347,6 +360,16 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         String(b.variety || '').trim().slice(0, 80),
         String(b.notes || '').slice(0, 500)
       );
+    } else if (path === '/api/update-plant') {
+      admin(user);
+      const r = await baseDb.run(
+        'UPDATE plants SET crop_name=?,variety=?,notes=? WHERE plant_id=?',
+        required(b.crop_name, 'Crop name', 80),
+        String(b.variety || '').trim().slice(0, 80),
+        String(b.notes || '').slice(0, 500),
+        identifier(b.plant_id)
+      );
+      if (!r.changes) fail('Crop not found.', 404);
     } else if (path === '/api/remove-plant') {
       admin(user);
       await transaction(async tx => {
@@ -709,6 +732,35 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         await tx.run('UPDATE users SET password_hash=? WHERE user_id=?', hashPassword(b.password), user.user_id);
         await tx.run('DELETE FROM sessions WHERE user_id=?', user.user_id);
       });
+    } else if (path === '/api/restore') {
+      admin(user);
+      if (b.version !== 1 || !b.tables || typeof b.tables !== 'object') fail('Invalid backup file format.');
+      for (const [table] of BACKUP_TABLES) {
+        if (!Array.isArray(b.tables[table])) fail(`Backup is missing the ${table} table.`);
+      }
+      if (!b.tables.users.some(u => u && u.role === 'Admin' && Number(u.active) === 1 && !u.removed_at)) {
+        fail('Backup must include at least one active administrator account.');
+      }
+      await transaction(async tx => {
+        await tx.run('DELETE FROM sessions');
+        await tx.run('DELETE FROM push_subscriptions');
+        for (const [table] of [...BACKUP_TABLES].reverse()) {
+          await tx.run(`DELETE FROM ${table}`);
+        }
+        for (const [table, pk, cols] of BACKUP_TABLES) {
+          const rows = table === 'plots'
+            ? [...b.tables.plots].sort((a, c) => (a.parent_plot_id == null ? 0 : 1) - (c.parent_plot_id == null ? 0 : 1))
+            : b.tables[table];
+          const placeholders = cols.map(() => '?').join(',');
+          const sql = `INSERT INTO ${table}(${cols.join(',')}) VALUES(${placeholders})`;
+          for (const row of rows) {
+            if (!row || typeof row !== 'object') fail(`Invalid row in ${table}.`);
+            await tx.run(sql, ...cols.map(col => row[col] === undefined ? null : row[col]));
+          }
+          await tx.run(`SELECT setval(pg_get_serial_sequence('${table}', '${pk}'), COALESCE((SELECT MAX(${pk}) FROM ${table}), 1), (SELECT COUNT(*) > 0 FROM ${table}))`);
+        }
+      });
+      return { ok: true, signed_out: true };
     } else {
       fail('Endpoint not found.', 404);
     }
@@ -785,7 +837,7 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         req.headers['x-forwarded-proto'] === 'https' ||
         Boolean(process.env.VERCEL);
 
-      const bodyLimit=path==='/api/plot-entry'?370000:16384;
+      const bodyLimit = path === '/api/restore' ? 5000000 : path === '/api/plot-entry' ? 370000 : 16384;
       let b = {};
       if (req.method === 'POST') {
         if (req.headers.origin && req.headers.origin !== `${isSecure ? 'https' : 'http'}://${req.headers.host}`) {
@@ -886,6 +938,64 @@ export function createHandler(dbPool, { today = gardenDate, secure = false } = {
         if(!p?.photo_data)fail('Plot photo not found.',404);
         res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'private, no-cache'});
         res.end(Buffer.from(p.photo_data.split(',')[1],'base64'));return;
+      }
+
+      if (req.method === 'GET' && path === '/api/backup') {
+        admin(user);
+        const client = await dbPool.connect();
+        try {
+          await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+          const tx = createRunner(client);
+          const tables = {};
+          for (const [table, pk, cols] of BACKUP_TABLES) {
+            tables[table] = await tx.all(`SELECT ${cols.join(',')} FROM ${table} ORDER BY ${pk}`);
+          }
+          await client.query('COMMIT');
+          res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'Content-Disposition': `attachment; filename="botaniq-backup-${today()}.json"`
+          });
+          res.end(JSON.stringify({ version: 1, exported_at: new Date().toISOString(), tables }));
+          return;
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+      }
+
+      if (req.method === 'GET' && path === '/api/tasks') {
+        const isAdmin = user.role === 'Admin';
+        const currentToday = today();
+        const page = Math.max(1, Number.parseInt(url.searchParams.get('page') || '1', 10) || 1);
+        const limit = Math.min(100, Math.max(1, Number.parseInt(url.searchParams.get('limit') || '20', 10) || 20));
+        const status = url.searchParams.get('status') || 'All';
+        const staffId = isAdmin && url.searchParams.get('staff_id') ? identifier(url.searchParams.get('staff_id')) : null;
+        const q = (url.searchParams.get('q') || '').trim();
+        const where = ['(? OR t.assigned_staff_id=?)'];
+        const args = [isAdmin, user.user_id];
+        if (staffId) { where.push('t.assigned_staff_id=?'); args.push(staffId); }
+        if (status === 'Open') { where.push("t.status='Pending'"); }
+        else if (status === 'Missed') { where.push("(t.status='Missed' OR (t.status='Pending' AND t.scheduled_date<?))"); args.push(currentToday); }
+        else if (status === 'Done') { where.push("t.status IN ('Completed','Skipped')"); }
+        if (q) {
+          const pattern = `%${q.toLowerCase()}%`;
+          where.push('(LOWER(t.task_type) LIKE ? OR LOWER(p.plot_code::text) LIKE ? OR LOWER(COALESCE(u.full_name,\'\')) LIKE ?)');
+          args.push(pattern, pattern, pattern);
+        }
+        const from = `FROM maintenance_tasks t JOIN plots p ON t.plot_id=p.plot_id LEFT JOIN users u ON t.assigned_staff_id=u.user_id LEFT JOIN users s ON t.substitute_staff_id=s.user_id LEFT JOIN users prev ON prev.user_id=t.covered_for_id WHERE ${where.join(' AND ')}`;
+        const countRow = await baseDb.get(`SELECT COUNT(*)::int AS total ${from}`, ...args);
+        const total = countRow.total;
+        const pages = Math.max(1, Math.ceil(total / limit));
+        const safePage = Math.min(page, pages);
+        const items = await baseDb.all(
+          `SELECT t.*,p.plot_code,p.zone,u.full_name AS assigned_staff,s.full_name AS substitute_staff,prev.full_name AS covered_for,EXISTS(SELECT 1 FROM coverage_invites i WHERE i.task_id=t.task_id) AS needs_cover ${from} ORDER BY t.scheduled_date DESC,t.scheduled_time DESC,t.task_id DESC LIMIT ? OFFSET ?`,
+          ...args, limit, (safePage - 1) * limit
+        );
+        json({ items, total, page: safePage, limit, pages });
+        return;
       }
 
       if (req.method === 'GET' && path === '/api/state') {

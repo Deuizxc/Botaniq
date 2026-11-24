@@ -168,3 +168,22 @@ test('reports list each staff member for admins and stay closed to staff',()=>{
   assert.match(page('Admin')("reportKind='Monthly';reportsPage()"),/Monthly task report/);
   assert.doesNotMatch(page('Staff')('shell.toString().includes("isAdmin()?[[")?"":"reports"'),/reports/);
 });
+
+test('pagination controls appear on large task lists and report chart renders inline SVG',()=>{
+  const render=page('Admin');
+  render("state.tasks=Array.from({length:20},(_,i)=>({task_id:i+1,plot_id:1,plot_code:'OP-01',zone:'Outdoor',task_type:'Manual watering',assigned_staff_id:2,assigned_staff:'Garden Staff',status:'Pending',scheduled_date:'2026-10-23',scheduled_time:'08:00'}))");
+  const p1=render('tasksPage()');
+  assert.match(p1,/Page 1 of 2 \(20 records\)/);assert.equal((p1.match(/class="task-item"/g)||[]).length,15);
+  const p2=render('taskPage=2;tasksPage()');
+  assert.match(p2,/Page 2 of 2/);assert.equal((p2.match(/class="task-item"/g)||[]).length,5);
+  const report=render('reportsPage()');
+  assert.match(report,/class="report-chart"/);assert.match(report,/aria-label="Task outcome breakdown by staff member"/);
+});
+
+test('crop edit, backup/restore controls, and SDG alignment are rendered appropriately',()=>{
+  const admin=page('Admin'),staff=page('Staff');
+  assert.match(admin('inventoryPage()'),/data-action="edit-plant"/);
+  assert.doesNotMatch(staff('inventoryPage()'),/data-action="edit-plant"/);
+  assert.match(admin('staffPage()'),/href="\/api\/backup"/);assert.match(admin('staffPage()'),/data-action="restore-backup"/);
+  assert.match(admin("let html='';document.querySelector=()=>({set innerHTML(v){html=v}});renderLanding();html"),/SDG 2.*SDG 11.*SDG 12/s);
+});
