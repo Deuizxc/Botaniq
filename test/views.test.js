@@ -200,3 +200,48 @@ test('crop edit, direct plot crop actions, backup/restore controls, and SDG alig
     assert.match(houseCard,/View interior/);assert.match(houseCard,/plot-info\.html\?greenhouse=30/);assert.match(houseCard,/Ginger/);
   }
 });
+
+test('map panning transforms svg on GPU layer, clamps bounds, and supports pinch-to-zoom',()=>{
+  const render=page('Staff');
+  const result=render(`
+    let ctmCalls=0, captures=0, rafCalls=0, rafCb=null, ariaWrites=0, flushedWhilePanning=false, now=100;
+    const listeners={}, classes=new Set();
+    const svg={
+      style:{transform:''}, viewBox:{baseVal:{width:1000,height:700}},
+      addEventListener(){}, getScreenCTM(){ctmCalls++;return {inverse:()=>({a:1,d:1})}}
+    };
+    const viewport={
+      clientWidth:500, clientHeight:350,
+      addEventListener(e,fn){listeners[e]=fn},
+      getBoundingClientRect(){return {left:0,top:0,width:500,height:350}},
+      setPointerCapture(){captures++}, hasPointerCapture(){return true}, releasePointerCapture(){},
+      classList:{add(c){classes.add(c)},remove(c){if(c==='panning'&&!flushedWhilePanning)flushedWhilePanning=svg.style.transform==='translate3d(40px,20px,0) scale(1)';classes.delete(c)}}
+    };
+    const map={classList:{toggle(){}}};
+    document.querySelector=s=>s==='.map-svg'?svg:s==='.map-viewport'?viewport:s==='.garden-map'?map:null;
+    document.querySelectorAll=()=>[{dataset:{id:'1'},setAttribute(){ariaWrites++}}];
+    performance={now:()=>now};
+    matchMedia=()=>({matches:true});
+    requestAnimationFrame=cb=>{rafCalls++;rafCb=cb;return rafCalls};
+    cancelAnimationFrame=()=>{rafCb=null};
+    mountGardenMap();
+    const initAria=ariaWrites;
+    const target={closest(){return null}};
+    listeners.pointerdown({pointerType:'touch',button:0,pointerId:1,clientX:10,clientY:10,target});
+    now=120; listeners.pointermove({pointerId:1,clientX:30,clientY:20});
+    now=220; listeners.pointermove({pointerId:1,clientX:50,clientY:30});
+    now=350; listeners.pointerup({type:'pointerup',pointerId:1});
+    const panTransform=svg.style.transform, panAfter=mapPan;
+    listeners.pointerdown({pointerType:'touch',button:0,pointerId:1,clientX:200,clientY:175,target});
+    listeners.pointerdown({pointerType:'touch',button:0,pointerId:2,clientX:300,clientY:175,target});
+    listeners.pointermove({pointerId:2,clientX:400,clientY:175});
+    listeners.pointerup({type:'pointerup',pointerId:2});
+    listeners.pointerup({type:'pointerup',pointerId:1});
+    JSON.stringify({ctmCalls,captures,rafCalls,ariaDelta:ariaWrites-initAria,panAfter,panTransform,flushedWhilePanning,zoomAfterPinch:mapZoom,panningAfter:classes.has('panning')})
+  `);
+  assert.deepEqual(JSON.parse(result),{
+    ctmCalls:0,captures:1,rafCalls:2,ariaDelta:0,
+    panAfter:{x:80,y:40},panTransform:'translate3d(40px,20px,0) scale(1)',
+    flushedWhilePanning:true,zoomAfterPinch:2,panningAfter:false
+  });
+});
