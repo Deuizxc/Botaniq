@@ -28,7 +28,7 @@ const icon = name => `<svg aria-hidden="true" viewBox="0 0 24 24"><path d="${pat
 let state, view, search = '', zone = 'All zones', taskFilter = 'Open', toastTimer;
 let staffFilter = 'all', cropSearch = '', calendarOffset = 0, calendarDate = '', mapZoom = 1, taskPage = 1, historyPage = 1;
 const PAGE_SIZE = 15;
-let mapPan = {x:0,y:0}, stopMapGlide = () => {};
+let mapPan = {x:0,y:0};
 let reportKind = 'Weekly', reportOffset = 0, reportStaff = 'all';
 const pageNames = {dashboard:'Overview',plots:'Garden plots',tasks:'Maintenance tasks',reports:'Task reports',inventory:'Crop information',staff:'Staff & access',nutrients:'Nutrient log'};
 let editingMap=false, mapPlacing=false, mapEditId=null, mapSaving=false, mapExtent=100, mapWidth=100;
@@ -201,7 +201,7 @@ function gardenMap(compact=false) {
   return `<section class="garden-map ${house?'greenhouse-view':''} ${compact?'compact':''} ${editingMap?'editing-map':''} ${mapPlacing?'placing-plot':''}" aria-label="Interactive garden map">
     ${editingMap?mapEditorToolbar():''}
     <div class="map-caption"><span class="eyebrow">CUAI / Garden atlas</span><label class="map-picker"><span class="sr-only">Choose a plot</span><select id="map-picker"><option value="">Choose a plot…</option>${[...plots].sort((a,b)=>a.map_slot-b.map_slot).map(p=>`<option value="${p.plot_id}" ${selectedPlot()?.plot_id===p.plot_id?'selected':''}>${p.map_slot?`${p.map_slot} · `:''}${escape(p.plot_code)}</option>`).join('')}</select></label><span>${icon('sprout')} Tap a space. See what’s growing.</span></div>
-    <div class="map-viewport"><div class="map-stage"><svg class="map-svg" viewBox="0 0 ${width} ${height}" aria-label="${house?`Beds inside ${escape(house.plot_code)}`:'Garden plots. Drag or use arrow keys to move the map.'}" role="group" tabindex="0">
+    <div class="map-viewport"><svg class="map-svg" viewBox="0 0 ${width} ${height}" aria-label="${house?`Beds inside ${escape(house.plot_code)}`:'Garden plots. Drag or use arrow keys to move the map.'}" role="group" tabindex="0">
       <defs><pattern id="map-grain" width="46" height="46" patternUnits="userSpaceOnUse"><path d="M6 14l2-6 2 6M27 33l2-7 2 7M37 9l1-5 2 5M15 40l1-5 2 5" stroke="#6f9a52" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".45"/></pattern>
       <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2faf6"/><stop offset=".55" stop-color="#d3ebe2"/><stop offset="1" stop-color="#b9dccf"/></linearGradient>
       <pattern id="bed-rows" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M0 7h14" stroke="#3b2a18" opacity=".2" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="5 3"/></pattern>
@@ -220,7 +220,7 @@ function gardenMap(compact=false) {
         <g class="map-entrance"><text x="638" y="674">Entrance</text><path d="M713 669h17m-8-7 8 7-8 7"/></g>`}
         ${plots.map(mapPlotMarkup).join('')}
       </g>
-    </svg></div></div>
+    </svg></div>
     <div class="map-bottom"><div class="map-key"><strong>Colour = status</strong><span class="key-missed">Missed task</span><span class="key-care">Needs care today</span><span class="key-growing">Growing</span><span class="key-vacant">Vacant</span><strong>Shape = type</strong><span class="key-house">${house?'Greenhouse walls':'Greenhouse (tap to see its beds)'}</span><span class="key-nursery">Nursery</span><span class="key-space">Open space</span><span class="key-alert">Task due</span><span class="key-icon"><svg viewBox="-20 -36 40 38" aria-hidden="true"><use href="#map-seedling"/></svg>Seedling</span><span class="key-icon"><svg viewBox="-30 -56 60 58" aria-hidden="true"><use href="#map-plant"/></svg>Full-grown</span></div><div class="map-controls">${house?'':'<button class="icon-button" data-action="map-zoom" data-id="-0.25" aria-label="Zoom out">−</button><button class="icon-button" data-action="map-zoom" data-id="0.25" aria-label="Zoom in">+</button>'}<button class="btn secondary" data-action="map-reset" aria-label="Reset zoom and close plot details">Reset view</button></div></div>
     ${house?`<div class="greenhouse-beds">${plots.map(p=>{const crop=state.cycles.find(c=>c.current_plot_id===p.plot_id&&!c.harvest_date);return `<button class="greenhouse-bed" data-action="map-plot" data-id="${p.plot_id}"><strong>${escape(p.plot_code)}</strong><span>${escape(crop?`Occupied · ${crop.crop_name}${crop.variety?' · '+crop.variety:''} · ${growthStage(crop,state.today).label}`:'Vacant · Ready for planting')}</span></button>`;}).join('')||empty(isAdmin()?'No beds yet. Choose Edit map, then Add bed to lay out this greenhouse.':'No beds have been added yet.')}</div>`:''}
     ${compact?'':'<aside id="plot-inspector" class="plot-inspector" aria-label="Selected plot" hidden></aside>'}
@@ -324,60 +324,30 @@ function placeMapPlot(point) {
   mapPlacing=false;$('.garden-map')?.classList.remove('placing-plot');
   $('#map-edit-status').textContent=`Name the new ${house?'bed':'plot'} and save.`;
 }
-function mapMetrics(viewport=$('.map-viewport'),svg=$('.map-svg')) {
-  const vw=viewport?.clientWidth||1000,vh=viewport?.clientHeight||700;
-  const vb=svg?.viewBox?.baseVal,viewW=vb?.width||1000,viewH=vb?.height||700;
-  const k=Math.min(vw/viewW,vh/viewH);
-  return {vw,vh,viewW,viewH,k,ox:(vw-viewW*k)/2,oy:(vh-viewH*k)/2};
-}
 function mountGardenMap() {
-  const svg=$('.map-svg'), stage=$('.map-stage')||svg, viewport=$('.map-viewport')||svg, worldEl=$('.map-world');
+  const svg=$('.map-svg'), viewport=$('.map-viewport')||svg, worldEl=$('.map-world');
   if(!svg)return;
   fitMapLabels(svg);
-  const pointers=new Map();
-  let drag, pinch, suppressClick=false, panRaf=0, glideRaf=0;
+  let drag, suppressClick=false;
   const worldCtm=()=>worldEl.getScreenCTM().inverse();
   const toPoint=(event,ctm)=>new DOMPoint(event.clientX,event.clientY).matrixTransform(ctm);
   const point=event=>toPoint(event,worldCtm());
-  const stopGlide=()=>{if(glideRaf){cancelAnimationFrame(glideRaf);glideRaf=0;viewport.classList.remove('panning');}};
-  stopMapGlide=stopGlide;
-  const flushPan=s=>{panRaf=0;if(s&&!s.p)applyMapTransform(s.target,stage,svg,viewport,s.mobile,s.metrics);};
-  const startPan=(id,x,y,moved=false)=>({startX:x,startY:y,lastX:x,lastY:y,lastT:performance.now(),vx:0,vy:0,pan:{...mapPan},target:editingMap?null:selectedPlot(),mobile:matchMedia('(max-width: 700px)').matches,metrics:mapMetrics(viewport,svg),moved,pointerId:id});
   viewport.addEventListener('pointerdown',event=>{
     if((event.pointerType==='mouse'&&event.button!==0)||mapSaving)return;
-    stopGlide();
     suppressClick=false;
     const el=event.target.closest?.('.map-plot');
-    if(editingMap&&el&&!mapPlacing&&!pointers.size) {
+    if(editingMap&&el&&!mapPlacing) {
       const p=activePlots().find(p=>p.plot_id===Number(el.dataset.id));
       const corner=event.target.dataset.corner||'';
       selectMapEdit(p.plot_id);
       const ctm=worldCtm();
       drag={start:toPoint(event,ctm),ctm,p,bounds:plotBounds(p),corner,moved:false,pointerId:event.pointerId};
-      return;
-    }
-    if(greenhouse())return;
-    pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
-    if(pointers.size===1)drag=startPan(event.pointerId,event.clientX,event.clientY);
-    else if(pointers.size===2) {
-      if(panRaf){cancelAnimationFrame(panRaf);flushPan(drag);}
-      drag=null;suppressClick=true;viewport.classList.add('panning');
-      const [a,b]=[...pointers.values()],rect=viewport.getBoundingClientRect?.()||{left:0,top:0};
-      pinch={d0:Math.max(1,Math.hypot(b.x-a.x,b.y-a.y)),m0x:(a.x+b.x)/2-rect.left,m0y:(a.y+b.y)/2-rect.top,rect,zoom0:mapZoom,pan0:{...mapPan},target:editingMap?null:selectedPlot(),mobile:matchMedia('(max-width: 700px)').matches,metrics:mapMetrics(viewport,svg)};
+    } else if(!greenhouse()&&event.pointerType==='mouse') {
+      // Touch panning uses native compositor scrolling on .map-viewport; mouse gets click-and-drag scroll.
+      drag={startX:event.clientX,startY:event.clientY,scrollLeft:viewport.scrollLeft||0,scrollTop:viewport.scrollTop||0,moved:false,pointerId:event.pointerId};
     }
   });
   viewport.addEventListener('pointermove',event=>{
-    if(pointers.has(event.pointerId))pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
-    if(pinch&&pointers.size>=2) {
-      const [a,b]=[...pointers.values()],d=Math.max(1,Math.hypot(b.x-a.x,b.y-a.y));
-      const mx=(a.x+b.x)/2-pinch.rect.left,my=(a.y+b.y)/2-pinch.rect.top;
-      const nextZoom=Math.max(.75,Math.min(3,pinch.zoom0*(d/pinch.d0))),ratio=nextZoom/pinch.zoom0;
-      const cx=pinch.metrics.vw/2,cy=pinch.metrics.vh/2;
-      mapZoom=nextZoom;
-      mapPan={x:pinch.pan0.x*ratio+((mx-cx)*(1-ratio)+(mx-pinch.m0x))/pinch.metrics.k,y:pinch.pan0.y*ratio+((my-cy)*(1-ratio)+(my-pinch.m0y))/pinch.metrics.k};
-      if(!panRaf)panRaf=requestAnimationFrame(()=>flushPan(pinch));
-      return;
-    }
     if(!drag||event.pointerId!==drag.pointerId)return;
     if(drag.p) {
       const at=toPoint(event,drag.ctm),dx=at.x-drag.start.x,dy=at.y-drag.start.y;
@@ -388,11 +358,8 @@ function mountGardenMap() {
     }
     const sx=event.clientX-drag.startX,sy=event.clientY-drag.startY;
     if(!drag.moved){if(Math.hypot(sx,sy)<6)return;drag.moved=true;viewport.setPointerCapture?.(event.pointerId);viewport.classList.add('panning');}
-    const now=performance.now(),dt=Math.max(1,now-drag.lastT);
-    if(dt<100){drag.vx=drag.vx*.4+(event.clientX-drag.lastX)/dt*.6;drag.vy=drag.vy*.4+(event.clientY-drag.lastY)/dt*.6;}
-    drag.lastX=event.clientX;drag.lastY=event.clientY;drag.lastT=now;
-    mapPan={x:drag.pan.x+sx/drag.metrics.k,y:drag.pan.y+sy/drag.metrics.k};
-    if(!panRaf)panRaf=requestAnimationFrame(()=>flushPan(drag));
+    viewport.scrollLeft=drag.scrollLeft-sx;
+    viewport.scrollTop=drag.scrollTop-sy;
   });
   viewport.addEventListener('click',event=>{
     if(suppressClick){event.preventDefault();event.stopPropagation();suppressClick=false;return;}
@@ -401,36 +368,14 @@ function mountGardenMap() {
     else if(editingMap&&mapPlacing){event.preventDefault();event.stopPropagation();}
   },true);
   const endDrag=event=>{
-    pointers.delete(event.pointerId);
-    if(pinch&&pointers.size<2) {
-      const active=pinch;pinch=null;
-      if(panRaf){cancelAnimationFrame(panRaf);flushPan(active);}
-      if(pointers.size===1){const [[id,pt]]=pointers;drag=startPan(id,pt.x,pt.y,true);}
-      else viewport.classList.remove('panning');
-      return;
-    }
     if(!drag||event.pointerId!==drag.pointerId)return;
     const current=drag;drag=null;suppressClick=current.moved;
-    if(panRaf){cancelAnimationFrame(panRaf);flushPan(current);}
+    viewport.classList.remove('panning');
     if(viewport.hasPointerCapture?.(event.pointerId))viewport.releasePointerCapture(event.pointerId);
     if(current.p&&current.moved) {
-      viewport.classList.remove('panning');
       if(event.type==='pointerup')savePlotBounds(current.p,current.next);
       else paintMapPlot(current.p,current.bounds);
-      return;
     }
-    if(event.type==='pointerup'&&current.moved&&performance.now()-current.lastT<80&&Math.hypot(current.vx,current.vy)>.15) {
-      let vx=current.vx,vy=current.vy,last=performance.now();
-      const step=now=>{
-        const dt=Math.min(32,Math.max(1,now-last));last=now;
-        const decay=Math.pow(.92,dt/16);vx*=decay;vy*=decay;
-        if(Math.hypot(vx,vy)<.05){glideRaf=0;viewport.classList.remove('panning');return;}
-        mapPan={x:mapPan.x+vx*dt/current.metrics.k,y:mapPan.y+vy*dt/current.metrics.k};
-        applyMapTransform(current.target,stage,svg,viewport,current.mobile,current.metrics);
-        glideRaf=requestAnimationFrame(step);
-      };
-      glideRaf=requestAnimationFrame(step);
-    } else viewport.classList.remove('panning');
   };
   viewport.addEventListener('pointerup',endDrag);
   viewport.addEventListener('pointercancel',endDrag);
@@ -450,37 +395,39 @@ function mountGardenMap() {
       paintMapPlot(p,bounds);
       document.querySelector(`.map-plot[data-id="${p.plot_id}"]${corner?` [data-corner="${corner}"]`:''}`)?.focus({preventScroll:true});
       savePlotBounds(p,bounds);
-    } else if(!greenhouse()) {mapPan.x-=delta[0]*60;mapPan.y-=delta[1]*60;zoomMap(editingMap?null:selectedPlot());}
+    } else if(!greenhouse()) viewport.scrollBy?.({left:delta[0]*60,top:delta[1]*60,behavior:'smooth'});
   });
   $('#map-picker')?.addEventListener('change',event=>{if(editingMap)selectMapEdit(Number(event.target.value));else if(event.target.value)selectMapPlot(Number(event.target.value));else closeMapPlot();});
   zoomMap(editingMap?null:selectedPlot());
   if(editingMap)selectMapEdit(mapEditId);
   else if(view==='plots'&&selectedPlot())renderPlotInspector();
 }
-function applyMapTransform(p,stage=$('.map-stage')||$('.map-svg'),svg=$('.map-svg'),viewport=$('.map-viewport')||svg,mobile=matchMedia('(max-width: 700px)').matches,m=mapMetrics(viewport,svg)) {
-  if(!stage||greenhouse()){if(stage)stage.style.transform='';return;}
-  const hasPlot=Boolean(p&&!p.removed_at),scale=(hasPlot?(mobile?1.25:1.65):1)*mapZoom;
-  let baseTx=m.vw/2*(1-scale),baseTy=m.vh/2*(1-scale);
-  if(hasPlot) {
-    const [x,y,w,h]=plotBounds(p),left=x>55;
-    baseTx=(mobile?m.vw*.5:left?m.vw*.69:m.vw*.31)-(m.ox+(x+w/2)*10*m.k)*scale;
-    baseTy=m.vh*.46-(m.oy+(y+h/2)*7*m.k)*scale;
-  }
-  const pad=Math.min(m.vw,m.vh)*.28;
-  const tx=Math.max(pad-(m.ox+m.viewW*m.k)*scale,Math.min(m.vw-pad-m.ox*scale,baseTx+mapPan.x*m.k));
-  const ty=Math.max(pad-(m.oy+m.viewH*m.k)*scale,Math.min(m.vh-pad-m.oy*scale,baseTy+mapPan.y*m.k));
-  mapPan={x:(tx-baseTx)/m.k,y:(ty-baseTy)/m.k};
-  stage.style.transform=scale===1&&!tx&&!ty?'':`translate3d(${tx}px,${ty}px,0) scale(${scale})`;
-}
 function zoomMap(p) {
-  stopMapGlide();
-  const svg=$('.map-svg');if(!svg)return;
+  const svg=$('.map-svg'), viewport=$('.map-viewport')||svg;if(!svg)return;
   const selectedId=editingMap?mapEditId:p?.plot_id;
   if($('#map-picker'))$('#map-picker').value=selectedId||'';
   document.querySelectorAll('.map-plot').forEach(el=>el.setAttribute('aria-pressed',String(Number(el.dataset.id)===selectedId)));
-  $('.garden-map').classList.toggle('has-selection',Boolean(p&&!p.removed_at));
-  applyMapTransform(p,$('.map-stage')||svg,svg);
-  if(p&&!p.removed_at)$('#plot-inspector')?.classList.toggle('on-left',plotBounds(p)[0]>55);
+  const hasPlot=Boolean(p&&!p.removed_at);
+  $('.garden-map').classList.toggle('has-selection',hasPlot);
+  if(greenhouse()){svg.style.removeProperty('--map-zoom');if(hasPlot)$('#plot-inspector')?.classList.toggle('on-left',plotBounds(p)[0]>55);return;}
+  const mobile=matchMedia('(max-width: 700px)').matches;
+  const scale=(hasPlot?(mobile?1.15:1.5):1)*mapZoom;
+  const prevW=svg.clientWidth||0,prevH=svg.clientHeight||0,vw=viewport.clientWidth||0,vh=viewport.clientHeight||0;
+  const cx=prevW?((viewport.scrollLeft||0)+vw/2)/prevW:.5,cy=prevH?((viewport.scrollTop||0)+vh/2)/prevH:.5;
+  svg.style.setProperty('--map-zoom',String(scale));
+  const sw=svg.clientWidth||0,sh=svg.clientHeight||0;
+  if(hasPlot) {
+    const [x,y,w,h]=plotBounds(p),left=x>55,vb=svg.viewBox?.baseVal;
+    const viewW=vb?.width||1000,viewH=vb?.height||700;
+    const px=(x+w/2)*10/viewW*sw,py=(y+h/2)*7/viewH*sh;
+    const tx=mobile?vw/2:left?vw*.69:vw*.31,ty=vh/2;
+    viewport.scrollTo?.({left:Math.max(0,px-tx),top:Math.max(0,py-ty),behavior:'smooth'});
+    $('#plot-inspector')?.classList.toggle('on-left',left);
+  } else if(scale===1) {
+    viewport.scrollTo?.({left:0,top:0,behavior:'smooth'});
+  } else if(sw&&sh) {
+    viewport.scrollTo?.({left:Math.max(0,cx*sw-vw/2),top:Math.max(0,cy*sh-vh/2)});
+  }
 }
 function selectMapPlot(id) {
   if(view!=='plots'){navigate(`plot-info.html?id=${id}`);return;}
@@ -825,7 +772,7 @@ document.addEventListener('click',async event=>{
     if(action==='map-place-cancel'){mapPlacing=false;renderMain();return;}
     if(action==='map-plot'){if(editingMap)selectMapEdit(Number(id));else selectMapPlot(Number(id));return;}
     if(action==='map-reset'){mapZoom=1;closeMapPlot();return;}
-    if(action==='map-zoom'){mapZoom=Math.max(.75,Math.min(3,mapZoom+Number(id)));zoomMap(selectedPlot());return;}
+    if(action==='map-zoom'){mapZoom=Math.max(.5,Math.min(2.5,mapZoom+Number(id)));zoomMap(selectedPlot());return;}
     if(action==='plot-tab'){plotTab=id;editingPlot=false;renderPlotInspector();document.querySelector(`[data-action="plot-tab"][data-id="${id}"]`)?.focus();return;}
     if(action==='plot-edit'){if(isAdmin()){editingPlot=true;renderPlotInspector();$('#plot-description')?.focus();}return;}
     if(action==='plot-cancel'){editingPlot=false;renderPlotInspector();return;}

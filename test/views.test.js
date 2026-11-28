@@ -201,47 +201,43 @@ test('crop edit, direct plot crop actions, backup/restore controls, and SDG alig
   }
 });
 
-test('map panning transforms svg on GPU layer, clamps bounds, and supports pinch-to-zoom',()=>{
+test('map panning lets touch scroll natively, supports desktop mouse drag, and scales via --map-zoom',()=>{
   const render=page('Staff');
   const result=render(`
-    let ctmCalls=0, captures=0, rafCalls=0, rafCb=null, ariaWrites=0, flushedWhilePanning=false, now=100;
-    const listeners={}, classes=new Set();
+    let captures=0, scrolledTo=null;
+    const listeners={}, classes=new Set(), props={};
     const svg={
-      style:{transform:''}, viewBox:{baseVal:{width:1000,height:700}},
-      addEventListener(){}, getScreenCTM(){ctmCalls++;return {inverse:()=>({a:1,d:1})}}
+      clientWidth:640, clientHeight:448, viewBox:{baseVal:{width:1000,height:700}},
+      style:{setProperty(k,v){props[k]=v},removeProperty(k){delete props[k]}},
+      addEventListener(){}
     };
     const viewport={
-      clientWidth:500, clientHeight:350,
+      clientWidth:360, clientHeight:448, scrollLeft:100, scrollTop:80,
       addEventListener(e,fn){listeners[e]=fn},
-      getBoundingClientRect(){return {left:0,top:0,width:500,height:350}},
+      scrollTo(opts){scrolledTo=opts},
       setPointerCapture(){captures++}, hasPointerCapture(){return true}, releasePointerCapture(){},
-      classList:{add(c){classes.add(c)},remove(c){if(c==='panning'&&!flushedWhilePanning)flushedWhilePanning=svg.style.transform==='translate3d(40px,20px,0) scale(1)';classes.delete(c)}}
+      classList:{add(c){classes.add(c)},remove(c){classes.delete(c)}}
     };
     const map={classList:{toggle(){}}};
     document.querySelector=s=>s==='.map-svg'?svg:s==='.map-viewport'?viewport:s==='.garden-map'?map:null;
-    document.querySelectorAll=()=>[{dataset:{id:'1'},setAttribute(){ariaWrites++}}];
-    performance={now:()=>now};
+    document.querySelectorAll=()=>[];
     matchMedia=()=>({matches:true});
-    requestAnimationFrame=cb=>{rafCalls++;rafCb=cb;return rafCalls};
-    cancelAnimationFrame=()=>{rafCb=null};
     mountGardenMap();
-    const initAria=ariaWrites;
     const target={closest(){return null}};
+    // Touch drag is ignored by JS so the browser compositor scrolls .map-viewport natively.
     listeners.pointerdown({pointerType:'touch',button:0,pointerId:1,clientX:10,clientY:10,target});
-    now=120; listeners.pointermove({pointerId:1,clientX:30,clientY:20});
-    now=220; listeners.pointermove({pointerId:1,clientX:50,clientY:30});
-    now=350; listeners.pointerup({type:'pointerup',pointerId:1});
-    const panTransform=svg.style.transform, panAfter=mapPan;
-    listeners.pointerdown({pointerType:'touch',button:0,pointerId:1,clientX:200,clientY:175,target});
-    listeners.pointerdown({pointerType:'touch',button:0,pointerId:2,clientX:300,clientY:175,target});
-    listeners.pointermove({pointerId:2,clientX:400,clientY:175});
-    listeners.pointerup({type:'pointerup',pointerId:2});
+    listeners.pointermove({pointerId:1,clientX:60,clientY:40});
     listeners.pointerup({type:'pointerup',pointerId:1});
-    JSON.stringify({ctmCalls,captures,rafCalls,ariaDelta:ariaWrites-initAria,panAfter,panTransform,flushedWhilePanning,zoomAfterPinch:mapZoom,panningAfter:classes.has('panning')})
+    const afterTouch={left:viewport.scrollLeft,top:viewport.scrollTop,captures};
+    // Desktop mouse drag scrolls .map-viewport directly.
+    listeners.pointerdown({pointerType:'mouse',button:0,pointerId:2,clientX:50,clientY:50,target});
+    listeners.pointermove({pointerId:2,clientX:20,clientY:10});
+    listeners.pointerup({type:'pointerup',pointerId:2});
+    JSON.stringify({afterTouch,afterMouse:{left:viewport.scrollLeft,top:viewport.scrollTop,captures},zoomProp:props['--map-zoom'],scrolledTo,panningAfter:classes.has('panning')})
   `);
   assert.deepEqual(JSON.parse(result),{
-    ctmCalls:0,captures:1,rafCalls:2,ariaDelta:0,
-    panAfter:{x:80,y:40},panTransform:'translate3d(40px,20px,0) scale(1)',
-    flushedWhilePanning:true,zoomAfterPinch:2,panningAfter:false
+    afterTouch:{left:100,top:80,captures:0},
+    afterMouse:{left:130,top:120,captures:1},
+    zoomProp:'1',scrolledTo:{left:0,top:0,behavior:'smooth'},panningAfter:false
   });
 });
